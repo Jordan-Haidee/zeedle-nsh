@@ -66,3 +66,31 @@ powershell -File scripts/check-windows-startup.ps1
 - `theme.json` — light and dark theme tokens.
 
 The original Zeedle project is maintained at [Jordan-Haidee/zeedle](https://github.com/Jordan-Haidee/zeedle). This repository is its NSH port; it is not the original Slint application.
+
+## Screenshots
+
+The following full-window captures show the Windows app in English. Search, lyrics and metadata editing are shown with “Love Story” by Taylor Swift.
+
+### Music library
+
+![Zeedle music library](docs/screenshots/gallery.png)
+
+### Search
+
+![Search results for Love Story](docs/screenshots/search.png)
+
+### Synchronized lyrics
+
+![Synchronized lyrics for Love Story](docs/screenshots/lyrics.png)
+
+### Settings
+
+![Zeedle settings](docs/screenshots/settings.png)
+
+### About
+
+![About Zeedle and NSH](docs/screenshots/about.png)
+
+### Edit song metadata
+
+![Edit metadata for Love Story](docs/screenshots/metadata-editor.png)
