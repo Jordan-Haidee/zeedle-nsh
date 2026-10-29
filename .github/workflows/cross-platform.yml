@@ -1,0 +1,58 @@
+name: Cross-platform build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            os: windows-latest
+          - name: Windows ARM64
+            os: windows-11-arm
+          - name: Linux x64
+            os: ubuntu-24.04
+          - name: Linux ARM64
+            os: ubuntu-24.04-arm
+          - name: macOS Intel
+            os: macos-15-intel
+          - name: macOS Apple Silicon
+            os: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential \
+            libasound2-dev \
+            libdbus-1-dev \
+            libfontconfig1-dev \
+            libfreetype6-dev \
+            libgtk-4-dev \
+            libxkbcommon-dev \
+            pkg-config
+
+      - name: Build
+        run: cargo build --locked
+
+      - name: Run Rust tests
+        run: cargo test --locked
