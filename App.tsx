@@ -1,4 +1,4 @@
-import { Image, List, Scroll, Storage, Text, View, colorScheme, keymap, mount, openUrl, setColorScheme, signal } from "nsh";
+import { Image, List, Scroll, Storage, Text, View, colorScheme, keymap, mount, openUrl, setColorScheme, signal, token } from "nsh";
 import { Input } from "nsh/base";
 import { Menu, titleBar, Window } from "nsh/desktop";
 import { Music } from "zeedle-nsh/native";
@@ -12,21 +12,6 @@ type Language = "en" | "zh" | "es" | "fr" | "de" | "ru";
 type SongInfo = { id: number; song_name: string; singer: string; duration: string; duration_secs: number; song_path: string };
 type LyricItem = { time: number; duration: number; text: string };
 type PlaybackState = { position: number; duration: number; paused: boolean; volume: number; error: string; spectrum: number[] };
-const palette = {
-  page: "#141414",
-  panel: "#272727",
-  raised: "#333333",
-  hover: "#323232",
-  line: "#454545",
-  text: "#f5f5f5",
-  secondary: "#c4c4c4",
-  muted: "#a0a0a0",
-  accent: "#6cc4ff",
-  accentSoft: "#20354e",
-  white: "#ffffff",
-  danger: "#ef7378",
-};
-
 function timeLabel(seconds: number) {
   const value = Math.max(0, Math.floor(seconds || 0));
   return `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
@@ -36,7 +21,7 @@ function App() {
   const page = signal<Page>(0);
   const expanded = signal(false);
   const light = () => colorScheme() === "light";
-  const followSystem = signal(false);
+  const followSystem = signal(true);
   const language = signal<Language>("en");
   const directory = signal(Music.defaultDirectory());
   const songs = signal<SongInfo[]>([]);
@@ -349,7 +334,7 @@ function App() {
       Storage.getItem("zeedle.language"),
     ]);
     if (savedTheme !== null) { followSystem.set(false); setColorScheme(savedTheme === "true" ? "light" : "dark"); }
-    else { followSystem.set(false); setColorScheme("dark"); }
+    else { followSystem.set(true); setColorScheme("system"); }
     if (savedVolume !== null) {
       const parsed = Number(savedVolume);
       if (Number.isFinite(parsed)) volume.set(Math.max(0, Math.min(1, parsed)));
@@ -376,19 +361,34 @@ function App() {
     }
   }, 120);
 
-  const textColor = () => light() ? "#1f2024" : palette.text;
-  const secondaryColor = () => light() ? "#666970" : palette.secondary;
-  const mutedColor = () => light() ? "#858991" : palette.muted;
-  const panelColor = () => light() ? "#f5f5f6" : palette.panel;
-  const raisedColor = () => light() ? "#ffffff" : palette.raised;
-  const lineColor = () => light() ? "#dedfe2" : palette.line;
-  const pageColor = () => light() ? "#ffffff" : palette.page;
+  const textColor = () => token("foreground");
+  const secondaryColor = () => token("text-secondary");
+  const mutedColor = () => token("text-tertiary");
+  const panelColor = () => token("panel");
+  const raisedColor = () => token("raised");
+  const lineColor = () => token("border");
+  const pageColor = () => token("page");
+  const hoverColor = () => token("hover");
+  const songHoverColor = () => token("song-hover");
+  const pressedColor = () => token("pressed");
+  const accentColor = () => token("primary");
+  const primaryForegroundColor = () => token("primary-foreground");
+  const inputBorderColor = () => token("input-border");
+  const dividerColor = () => token("divider");
+  const buttonColor = () => token("button");
+  const checkboxBorderColor = () => token("checkbox-border");
+  const dangerColor = () => token("danger");
+  const dangerSurfaceColor = () => token("danger-surface");
+  const dangerTextColor = () => token("danger-text");
+  const shadowColor = () => token("shadow");
+  const trackColor = () => token("track");
+  const trackThumbBorderColor = () => token("track-thumb-border");
 
   const textStyle = (size = 13, color = textColor(), weight: "400" | "500" | "600" | "700" = "400") => ({
     fontSize: size,
     color,
     fontWeight: weight,
-    fontFamily: "Segoe UI, Microsoft YaHei UI, sans-serif",
+    fontFamily: "Microsoft YaHei UI",
   });
 
   const controlStyle = (size = 36) => ({
@@ -407,10 +407,11 @@ function App() {
         testID={`nav-${props.target}`}
         accessibilityLabel={props.label}
         onPress={() => page.set(props.target)}
-        hoverStyle={{ backgroundColor: light() ? "#e8e9ec" : palette.hover }}
+        hoverStyle={{ backgroundColor: hoverColor() }}
         activeStyle={{ opacity: 0.72 }}
         style={{
           height: 38,
+          position: "relative",
           marginBottom: 5,
           marginHorizontal: 6,
           paddingHorizontal: expanded() ? 12 : 0,
@@ -419,12 +420,11 @@ function App() {
           alignItems: "center",
           justifyContent: expanded() ? "flex-start" : "center",
           borderRadius: 8,
-          backgroundColor: selected() ? (light() ? "#e8e9ec" : palette.hover) : "transparent",
-          borderLeftWidth: selected() ? 2 : 0,
-          borderLeftColor: palette.accent,
+          backgroundColor: selected() ? hoverColor() : "transparent",
         }}
       >
-        <LucideIcon name={props.icon} size={18} color={selected() ? palette.accent : secondaryColor()} />
+        {selected() ? <View pointerEvents="none" style={{ position: "absolute", left: 3, top: 11, width: 3, height: 16, borderRadius: 2, backgroundColor: accentColor() }} /> : null}
+        <LucideIcon name={props.icon} size={18} color={selected() ? accentColor() : secondaryColor()} />
         {expanded() ? <Text style={textStyle(13, selected() ? textColor() : secondaryColor(), selected() ? "600" : "400")}>{props.label}</Text> : null}
       </View>
     );
@@ -466,22 +466,23 @@ function App() {
               onContextMenu={() => openActions()}
               onHoverIn={() => hovered.set(true)}
               onHoverOut={() => hovered.set(false)}
-              activeStyle={{ backgroundColor: light() ? "#e8e8e8" : "#323232" }}
+              activeStyle={{ backgroundColor: pressedColor() }}
               style={{
                 height: 30,
                 flexDirection: "row",
                 alignItems: "center",
-                backgroundColor: isPlaying() ? (light() ? "#e8e8e8" : "#323232") : hovered() ? (light() ? "#e8e8e8" : "#252525") : "transparent",
+                justifyContent: "space-between",
+                backgroundColor: isPlaying() ? hoverColor() : hovered() ? songHoverColor() : "transparent",
               }}
             >
-              <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-                <Text numberOfLines={1} style={textStyle(15, isPlaying() ? palette.accent : textColor(), isPlaying() ? "600" : "400")}>{item().song_name}</Text>
+              <View style={{ width: "33%", justifyContent: "center" }}>
+                <Text numberOfLines={1} style={{ ...textStyle(14, isPlaying() ? accentColor() : textColor(), isPlaying() ? "600" : "400"), width: "100%", marginLeft: "40%" }}>{item().song_name}</Text>
               </View>
-              <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 }}>
-                <Text numberOfLines={1} style={textStyle(15, isPlaying() ? palette.accent : textColor())}>{item().singer}</Text>
+              <View style={{ width: "33%", justifyContent: "center" }}>
+                <Text numberOfLines={1} style={{ ...textStyle(14, isPlaying() ? accentColor() : textColor()), width: "100%", marginLeft: "40%" }}>{item().singer}</Text>
               </View>
-              <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-                <Text style={textStyle(15, isPlaying() ? palette.accent : textColor())}>{item().duration}</Text>
+              <View style={{ width: "33%", justifyContent: "center" }}>
+                <Text style={{ ...textStyle(14, isPlaying() ? accentColor() : textColor()), marginLeft: "40%" }}>{item().duration}</Text>
               </View>
             </View>
           );
@@ -493,18 +494,18 @@ function App() {
   function GalleryPage() {
     return (
       <View testID="screen-0" style={{ flex: 1, minHeight: 0, backgroundColor: pageColor() }}>
-        <View style={{ height: 30, flexDirection: "row", alignItems: "center" }}>
-          <View onPress={() => { if (sortField() === "song_name") ascending.set(!ascending()); else { sortField.set("song_name"); ascending.set(true); } }} style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 }}>
-            <Text style={textStyle(15, secondaryColor())}>{t("Title", "标题")}</Text>
-            {sortField() === "song_name" ? <LucideIcon name={ascending() ? "arrowUp" : "arrowDown"} size={14} color={secondaryColor()} /> : null}
+        <View style={{ height: 30, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <View onPress={() => { if (sortField() === "song_name") ascending.set(!ascending()); else { sortField.set("song_name"); ascending.set(true); } }} hoverStyle={{ backgroundColor: hoverColor() }} style={{ width: "33%", flexDirection: "row", alignItems: "center", gap: 5 }}>
+            <Text style={{ ...textStyle(14, mutedColor()), marginLeft: "40%" }}>{t("Title", "标题")}</Text>
+            {sortField() === "song_name" ? <LucideIcon name={ascending() ? "arrowUp" : "arrowDown"} size={12} color={mutedColor()} /> : null}
           </View>
-          <View onPress={() => { if (sortField() === "singer") ascending.set(!ascending()); else { sortField.set("singer"); ascending.set(true); } }} style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 }}>
-            <Text style={textStyle(15, secondaryColor())}>{t("Artist", "艺术家")}</Text>
-            {sortField() === "singer" ? <LucideIcon name={ascending() ? "arrowUp" : "arrowDown"} size={14} color={secondaryColor()} /> : null}
+          <View onPress={() => { if (sortField() === "singer") ascending.set(!ascending()); else { sortField.set("singer"); ascending.set(true); } }} hoverStyle={{ backgroundColor: hoverColor() }} style={{ width: "33%", flexDirection: "row", alignItems: "center", gap: 5 }}>
+            <Text style={{ ...textStyle(14, mutedColor()), marginLeft: "40%" }}>{t("Artist", "艺术家")}</Text>
+            {sortField() === "singer" ? <LucideIcon name={ascending() ? "arrowUp" : "arrowDown"} size={12} color={mutedColor()} /> : null}
           </View>
-          <View onPress={() => { if (sortField() === "duration_secs") ascending.set(!ascending()); else { sortField.set("duration_secs"); ascending.set(true); } }} style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 }}>
-            <Text style={textStyle(15, secondaryColor())}>{t("Duration", "时长")}</Text>
-            {sortField() === "duration_secs" ? <LucideIcon name={ascending() ? "arrowUp" : "arrowDown"} size={14} color={secondaryColor()} /> : null}
+          <View onPress={() => { if (sortField() === "duration_secs") ascending.set(!ascending()); else { sortField.set("duration_secs"); ascending.set(true); } }} hoverStyle={{ backgroundColor: hoverColor() }} style={{ width: "33%", flexDirection: "row", alignItems: "center", gap: 5 }}>
+            <Text style={{ ...textStyle(14, mutedColor()), marginLeft: "40%" }}>{t("Duration", "时长")}</Text>
+            {sortField() === "duration_secs" ? <LucideIcon name={ascending() ? "arrowUp" : "arrowDown"} size={12} color={mutedColor()} /> : null}
           </View>
         </View>
         <SongRows items={displayedSongs()} />
@@ -515,22 +516,27 @@ function App() {
   function SearchPage() {
     return (
       <View testID="screen-1" style={{ flex: 1, minHeight: 0, backgroundColor: pageColor() }}>
-        <View style={{ marginHorizontal: 12, marginTop: 7, marginBottom: 8, height: 26, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 3, borderBottomWidth: 2, borderBottomColor: palette.accent, backgroundColor: raisedColor() }}>
-          <LucideIcon name="search" size={17} color={mutedColor()} />
-          <Input
-            testID="song-search"
-            value={query()}
-            placeholder={t("Search songs or artists...", "搜索歌曲或艺术家…")}
-            onChange={updateSearch}
-            style={{ flex: 1, height: 22, color: textColor(), fontSize: 13, backgroundColor: "transparent" }}
-          />
-          {query() ? <View onPress={() => updateSearch("")} style={{ padding: 3 }}><LucideIcon name="x" size={14} color={mutedColor()} /></View> : null}
+        <View style={{ height: 40, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", backgroundColor: pageColor() }}>
+          <View style={{ flex: 1, height: 24, marginLeft: 3, marginRight: 2, flexDirection: "row", alignItems: "center", borderRadius: 3, borderBottomWidth: 2, borderBottomColor: accentColor() }}>
+            <Input
+              testID="song-search"
+              value={query()}
+              placeholder={t("Search songs or artists...", "搜索歌曲或艺术家…")}
+              onChange={updateSearch}
+              style={{ flex: 1, height: 24, paddingHorizontal: 4, color: textColor(), fontSize: 13, backgroundColor: "transparent" }}
+            />
+            {query() ? <View onPress={() => updateSearch("")} style={{ marginRight: 6, padding: 3 }}><LucideIcon name="x" size={14} color={mutedColor()} /></View> : null}
+          </View>
         </View>
-        {search() ? <Text style={{ ...textStyle(13, secondaryColor()), marginHorizontal: 12, marginBottom: 5 }}>{language() === "zh" ? `找到 ${searchResults().length} 个结果` : `${searchResults().length} result(s) found`}</Text> : null}
+        {search() ? (
+          <View style={{ height: 26, justifyContent: "center", paddingHorizontal: 12 }}>
+            <Text style={textStyle(12, mutedColor())}>{language() === "zh" ? `找到 ${searchResults().length} 个结果` : `${searchResults().length} result(s) found`}</Text>
+          </View>
+        ) : null}
         {search() ? <SongRows items={searchResults()} /> : (
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 9 }}>
-            <LucideIcon name="search" size={32} color={mutedColor()} />
-            <Text style={textStyle(13, secondaryColor())}>{t("Type to search your music", "输入关键词开始搜索")}</Text>
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 8 }}>
+            <LucideIcon name="search" size={44} color={mutedColor()} />
+            <Text style={textStyle(14, mutedColor())}>{t("Type to search your music", "输入关键词开始搜索")}</Text>
           </View>
         )}
       </View>
@@ -543,12 +549,12 @@ function App() {
     return (
       <View testID="screen-2" onLayout={(event) => panelHeight.set(event.size.height)} style={{ flex: 1, minHeight: 0, flexDirection: "row", backgroundColor: pageColor() }}>
         <View style={{ width: lyrics().length ? "30%" : "100%", padding: 20, alignItems: "center", justifyContent: "center" }}>
-          <View style={{ width: albumSize(), height: albumSize(), maxWidth: "100%", borderRadius: 9, overflow: "hidden", backgroundColor: raisedColor(), boxShadow: light() ? "0 12px 28px #00000018" : "0 12px 28px #00000055" }}>
+          <View style={{ width: albumSize(), height: albumSize(), maxWidth: "100%", borderRadius: 9, overflow: "hidden", backgroundColor: raisedColor(), boxShadow: `0 12px 28px ${shadowColor()}` }}>
             <Image src={art()} style={{ width: "100%", height: "100%" }} />
           </View>
           <View style={{ width: albumSize(), marginTop: 5, gap: 3 }}>
-            <Text numberOfLines={1} style={textStyle(15, textColor())}>{t("Artist:", "艺术家：")} {current()?.singer ?? t("Unknown", "未知")}</Text>
-            <Text numberOfLines={1} style={textStyle(15, textColor())}>{t("Title:", "歌曲：")} {current()?.song_name ?? t("No song", "无歌曲")}</Text>
+            <Text numberOfLines={1} style={textStyle(14, textColor())}>{t("Artist:", "艺术家：")} {current()?.singer ?? t("Unknown", "未知")}</Text>
+            <Text numberOfLines={1} style={textStyle(14, textColor())}>{t("Title:", "歌曲：")} {current()?.song_name ?? t("No song", "无歌曲")}</Text>
           </View>
         </View>
         {lyrics().length ? (
@@ -557,7 +563,7 @@ function App() {
               const active = () => position() >= line().time && position() < line().time + line().duration;
               return (
                 <View onPress={() => seekTo(line().time)} style={{ height: 40, alignItems: "center", justifyContent: "center" }}>
-                  <Text numberOfLines={1} style={textStyle(active() ? 20 : 17, active() ? palette.accent : textColor(), active() ? "600" : "400")}>{line().text}</Text>
+                  <Text numberOfLines={1} style={textStyle(active() ? 20 : 17, active() ? accentColor() : textColor(), active() ? "600" : "400")}>{line().text}</Text>
                 </View>
               );
             }}
@@ -568,24 +574,25 @@ function App() {
   }
 
   function SettingsPage() {
-    const cardStyle = {
+    const cardStyle = () => ({
       padding: 16,
       borderRadius: 8,
       borderWidth: 1,
-      borderColor: light() ? "#d7d7d7" : "#474747",
+      borderColor: lineColor(),
       backgroundColor: panelColor(),
-      gap: 11,
-    };
-    const sectionStyle = textStyle(12, secondaryColor(), "700");
-    const divider = <View style={{ height: 1, backgroundColor: light() ? "#d1d1d1" : "#414141" }} />;
+      gap: 10,
+    });
     const changeFollowSystem = () => {
       const next = !followSystem();
-      followSystem.set(next);
       if (next) {
+        followSystem.set(true);
         setColorScheme("system");
         void Storage.removeItem("zeedle.light-theme");
       } else {
-        void Storage.setItem("zeedle.light-theme", String(light()));
+        const currentScheme = colorScheme();
+        followSystem.set(false);
+        setColorScheme(currentScheme);
+        void Storage.setItem("zeedle.light-theme", String(currentScheme === "light"));
       }
     };
     const changeSpectrum = () => {
@@ -602,8 +609,8 @@ function App() {
           height: 18,
           borderRadius: 2,
           borderWidth: checked ? 0 : 1,
-          borderColor: light() ? "#888888" : "#9b9b9b",
-          backgroundColor: checked ? palette.accent : "transparent",
+          borderColor: checkboxBorderColor(),
+          backgroundColor: checked ? accentColor() : "transparent",
           alignItems: "center",
           justifyContent: "center",
         }}
@@ -615,16 +622,18 @@ function App() {
     return (
       <View testID="screen-3" style={{ flex: 1, minHeight: 0, backgroundColor: pageColor() }}>
       <Scroll testID="settings-scroll" style={{ flex: 1, backgroundColor: pageColor() }} contentStyle={{ padding: 24, gap: 20 }}>
-        <View style={cardStyle}>
-          <Text style={sectionStyle}>{t("Playback", "播放")}</Text>
-          {divider}
-          <Text style={textStyle(13, secondaryColor())}>{t("Music directory", "音乐文件夹")}</Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <View style={{ flex: 1, minWidth: 0, height: 32, justifyContent: "center", paddingHorizontal: 12, borderRadius: 4, borderWidth: 1, borderColor: light() ? "#d0d0d0" : "#414141", backgroundColor: raisedColor() }}>
-              <Text numberOfLines={1} style={textStyle(13, secondaryColor())}>{directory()}</Text>
-            </View>
-            <View onPress={() => void chooseDirectory()} style={{ paddingHorizontal: 12, height: 32, flexDirection: "row", alignItems: "center", justifyContent: "center", borderRadius: 4, backgroundColor: light() ? "#e9e9e9" : "#3b3b3b" }}>
-              <Text style={textStyle(13, textColor(), "500")}>{t("Browse…", "浏览…")}</Text>
+        <View style={cardStyle()}>
+          <Text style={textStyle(12, mutedColor(), "600")}>{t("Playback", "播放")}</Text>
+          <View style={{ height: 1, backgroundColor: dividerColor() }} />
+          <View style={{ gap: 6 }}>
+            <Text style={textStyle(13, secondaryColor())}>{t("Music directory", "音乐文件夹")}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <View style={{ flex: 1, minWidth: 0, height: 32, justifyContent: "center", paddingHorizontal: 12, borderRadius: 4, borderWidth: 1, borderColor: inputBorderColor(), backgroundColor: raisedColor() }}>
+                <Text numberOfLines={1} style={textStyle(13, secondaryColor())}>{directory()}</Text>
+              </View>
+              <View onPress={() => void chooseDirectory()} style={{ paddingHorizontal: 12, height: 32, flexDirection: "row", alignItems: "center", justifyContent: "center", borderRadius: 4, backgroundColor: buttonColor() }}>
+                <Text style={textStyle(13, textColor(), "500")}>{t("Browse…", "浏览…")}</Text>
+              </View>
             </View>
           </View>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
@@ -632,9 +641,9 @@ function App() {
             <Text onPress={changeSpectrum} style={textStyle(13, textColor())}>{t("Spectrum display", "频谱显示")}</Text>
           </View>
         </View>
-        <View style={cardStyle}>
-          <Text style={sectionStyle}>{t("Appearance", "外观")}</Text>
-          {divider}
+        <View style={cardStyle()}>
+          <Text style={textStyle(12, mutedColor(), "600")}>{t("Appearance", "外观")}</Text>
+          <View style={{ height: 1, backgroundColor: dividerColor() }} />
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
             {checkbox(followSystem(), changeFollowSystem)}
             <Text onPress={changeFollowSystem} style={textStyle(13, textColor())}>{t("Follow system theme", "跟随系统主题")}</Text>
@@ -664,11 +673,11 @@ function App() {
                     justifyContent: "center",
                     borderRadius: 4,
                     borderWidth: 1,
-                    borderColor: language() === option.code ? palette.accent : (light() ? "#d0d0d0" : "#414141"),
-                    backgroundColor: language() === option.code ? palette.accent : (light() ? "#e5e5e5" : "#333333"),
+                    borderColor: language() === option.code ? accentColor() : inputBorderColor(),
+                    backgroundColor: language() === option.code ? accentColor() : hoverColor(),
                   }}
                 >
-                  <Text numberOfLines={1} style={textStyle(11, language() === option.code ? "#ffffff" : textColor())}>{option.label}</Text>
+                  <Text numberOfLines={1} style={textStyle(13, language() === option.code ? primaryForegroundColor() : textColor())}>{option.label}</Text>
                 </View>
               ))}
             </View>
@@ -681,14 +690,16 @@ function App() {
 
   function AboutPage() {
     return (
-      <View testID="screen-4" style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: pageColor(), gap: 12 }}>
-        <View style={{ width: 88, height: 88, borderRadius: 18, overflow: "hidden", boxShadow: light() ? "0 10px 24px #00000016" : "0 10px 24px #00000044" }}>
-          <Image src={cover} style={{ width: "100%", height: "100%" }} />
-        </View>
-        <Text style={textStyle(22, textColor(), "600")}>Zeedle</Text>
-        <Text style={{ ...textStyle(12, secondaryColor()), textAlign: "center", maxWidth: 390 }}>{t("Music at the speed of a blink, designed for pure simplicity.", "轻快简洁的音乐播放器。")}</Text>
-        <Text style={textStyle(11, mutedColor())}>{t("Version 0.6.5 · Built with Rust and Native Shell", "版本 0.6.5 · 使用 Rust 和 Native Shell 构建")}</Text>
-        <Text onPress={() => void openUrl("https://github.com/Jordan-Haidee/Zeedle")} style={textStyle(12, palette.accent, "500")}>{t("Project information", "项目信息")}</Text>
+      <View testID="screen-4" style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: pageColor(), gap: 10 }}>
+        <Image src={cover} style={{ width: 120, height: 120 }} />
+        <Text style={{ ...textStyle(14, textColor()), textAlign: "center" }}>
+          {"Zeedle\nMusic at the speed of a blink, designed for pure simplicity\nBuilt by "}
+          <Text onPress={() => void openUrl("https://github.com/RustAudio/rodio")} style={{ color: accentColor() }}>Rodio</Text>
+          {" and "}
+          <Text onPress={() => void openUrl("https://slint.dev")} style={{ color: accentColor() }}>Slint UI</Text>
+          {"\nAuthor: Jordan Haidee\nVersion: 0.6.5\n"}
+          <Text onPress={() => void openUrl("https://github.com/Jordan-Haidee/Zeedle")} style={{ color: accentColor() }}>Github</Text>
+        </Text>
       </View>
     );
   }
@@ -700,47 +711,55 @@ function App() {
         <View
           onLayout={(event) => trackWidth.set(event.size.width)}
           onPress={(event) => seekTo(Math.max(0, Math.min(1, (event?.position.x ?? 0) / trackWidth())) * duration())}
-          style={{ height: 4, marginHorizontal: 10, backgroundColor: light() ? "#dddddd" : "#2a2a2a", justifyContent: "center" }}
+          style={{ height: 4, marginHorizontal: 10, backgroundColor: trackColor(), justifyContent: "center" }}
         >
-          <View style={{ height: 3, width: `${progressPercent()}%`, backgroundColor: palette.accent }} />
-          <View style={{ position: "absolute", left: `${progressPercent()}%`, top: -6, marginLeft: -7, width: 14, height: 14, borderRadius: 7, borderWidth: 3, borderColor: light() ? "#e8e8e8" : "#3b3b3b", backgroundColor: palette.accent }} />
+          <View style={{ height: 3, width: `${progressPercent()}%`, backgroundColor: accentColor() }} />
+          <View style={{ position: "absolute", left: `${progressPercent()}%`, top: -8, marginLeft: -10, width: 20, height: 20, borderRadius: 10, borderWidth: 3, borderColor: trackThumbBorderColor(), backgroundColor: accentColor() }} />
         </View>
         <View style={{ height: 68, flexDirection: "row", alignItems: "center", paddingHorizontal: 0 }}>
-          <View style={{ width: "35%", flexDirection: "row", alignItems: "center" }} onPress={() => page.set(2)}>
+          <View style={{ width: "35%", flexDirection: "row", alignItems: "center", gap: 3 }} onPress={() => page.set(2)}>
             <View style={{ width: "20%", alignItems: "center", justifyContent: "center" }}>
               <View style={{ width: 40, height: 40, borderRadius: 4, overflow: "hidden" }}>
                 <Image src={art()} style={{ width: 40, height: 40 }} />
               </View>
             </View>
-            <View style={{ width: "80%", paddingHorizontal: 5 }}>
+            <View style={{ width: "80%" }}>
               <Text numberOfLines={1} style={{ ...textStyle(14, textColor()), textAlign: "center" }}>
                 {current() ? `${current()!.song_name} - ${current()!.singer}` : t("No song selected", "尚未选择歌曲")}
               </Text>
             </View>
           </View>
-          <View style={{ width: "30%", flexDirection: "row", alignItems: "center", justifyContent: "space-around" }}>
-            <View accessibilityLabel={t("Repeat current track", "单曲循环")} onPress={() => mode.set(mode() === "order" ? "repeat" : mode() === "repeat" ? "order" : mode())} style={controlStyle(30)}>
-              <LucideIcon name={mode() === "repeat" ? "repeat2" : "repeat"} size={17} color={mode() === "order" ? secondaryColor() : palette.accent} />
+          <View style={{ width: "6%", flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+            <View accessibilityLabel={t("Repeat current track", "单曲循环")} onPress={() => mode.set(mode() === "order" ? "repeat" : mode() === "repeat" ? "order" : mode())} hoverStyle={{ backgroundColor: hoverColor() }} activeStyle={{ backgroundColor: pressedColor() }} style={controlStyle(20)}>
+              <LucideIcon name={mode() === "repeat" ? "repeat2" : "repeat"} size={18} color={mode() === "order" ? secondaryColor() : accentColor()} />
             </View>
-            <View accessibilityLabel={t("Previous track", "上一首")} onPress={playPrevious} style={controlStyle(30)}>
-              <LucideIcon name="skipBack" size={23} color={secondaryColor()} />
+          </View>
+          <View style={{ width: "6%", flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+            <View accessibilityLabel={t("Previous track", "上一首")} onPress={playPrevious} hoverStyle={{ backgroundColor: hoverColor() }} activeStyle={{ backgroundColor: pressedColor() }} style={controlStyle(36)}>
+              <LucideIcon name="skipBack" size={26} color={secondaryColor()} />
             </View>
-            <View accessibilityLabel={paused() ? t("Play", "播放") : t("Pause", "暂停")} onPress={togglePlay} style={controlStyle(34)}>
-              <LucideIcon name={paused() ? "play" : "pause"} size={20} color={palette.accent} />
+          </View>
+          <View style={{ width: "6%", flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+            <View accessibilityLabel={paused() ? t("Play", "播放") : t("Pause", "暂停")} onPress={togglePlay} hoverStyle={{ backgroundColor: hoverColor() }} activeStyle={{ backgroundColor: pressedColor() }} style={controlStyle(36)}>
+              <LucideIcon name={paused() ? "play" : "pause"} size={26} color={accentColor()} />
             </View>
-            <View accessibilityLabel={t("Next track", "下一首")} onPress={playNext} style={controlStyle(30)}>
-              <LucideIcon name="skipForward" size={23} color={secondaryColor()} />
+          </View>
+          <View style={{ width: "6%", flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+            <View accessibilityLabel={t("Next track", "下一首")} onPress={playNext} hoverStyle={{ backgroundColor: hoverColor() }} activeStyle={{ backgroundColor: pressedColor() }} style={controlStyle(36)}>
+              <LucideIcon name="skipForward" size={26} color={secondaryColor()} />
             </View>
-            <View accessibilityLabel={t("Shuffle", "随机播放")} onPress={() => mode.set(mode() === "random" ? "order" : "random")} style={controlStyle(30)}>
-              <LucideIcon name="shuffle" size={17} color={mode() === "random" ? palette.accent : secondaryColor()} />
+          </View>
+          <View style={{ width: "6%", flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+            <View accessibilityLabel={t("Shuffle", "随机播放")} onPress={() => mode.set(mode() === "random" ? "order" : "random")} hoverStyle={{ backgroundColor: hoverColor() }} activeStyle={{ backgroundColor: pressedColor() }} style={controlStyle(20)}>
+              <LucideIcon name="shuffle" size={18} color={mode() === "random" ? accentColor() : secondaryColor()} />
             </View>
           </View>
           <View style={{ width: "25%", alignItems: "center", justifyContent: "center" }}>
-            <Text style={textStyle(15, textColor())}>{timeLabel(position())} / {timeLabel(duration())}</Text>
+            <Text style={textStyle(14, textColor())}>{timeLabel(position())} / {timeLabel(duration())}</Text>
           </View>
           <View style={{ width: "10%", alignItems: "center", justifyContent: "center" }}>
-            <View accessibilityLabel={t("Mute", "静音")} onPress={() => { const next = volume() > 0 ? 0 : 0.8; volume.set(next); Music.setVolume(next); void Storage.setItem("zeedle.volume", String(next)); }} style={{ width: 28, height: 30, alignItems: "center", justifyContent: "center" }}>
-              <LucideIcon name="volume2" size={18} color={secondaryColor()} />
+            <View accessibilityLabel={t("Mute", "静音")} onPress={() => { const next = volume() > 0 ? 0 : 0.8; volume.set(next); Music.setVolume(next); void Storage.setItem("zeedle.volume", String(next)); }} hoverStyle={{ backgroundColor: hoverColor() }} activeStyle={{ backgroundColor: pressedColor() }} style={{ width: 28, height: 30, alignItems: "center", justifyContent: "center" }}>
+              <LucideIcon name="volume2" size={20} color={secondaryColor()} />
             </View>
           </View>
         </View>
@@ -752,27 +771,40 @@ function App() {
     <View style={{ flex: 1, flexDirection: "column", backgroundColor: pageColor(), borderWidth: 1, borderColor: lineColor(), overflow: "hidden" }}>
       <View
         desktop={{ windowDrag: true }}
-        style={{ height: titleBar().height || 40, minHeight: 40, flexDirection: "row", alignItems: "center", paddingLeft: titleBar().left + 10, paddingRight: titleBar().right + 8, backgroundColor: panelColor(), borderBottomWidth: 1, borderBottomColor: lineColor() }}
+        style={{ height: titleBar().height || 40, minHeight: 40, flexDirection: "row", alignItems: "center", paddingLeft: titleBar().left + 10, paddingRight: titleBar().right, backgroundColor: panelColor(), borderBottomWidth: 1, borderBottomColor: lineColor() }}
       >
-        <View style={{ width: 18, height: 18, borderRadius: 4, overflow: "hidden", marginRight: 7 }}>
+        <View style={{ width: 18, height: 18, borderRadius: 4, overflow: "hidden", marginRight: 6 }}>
           <Image src={cover} style={{ width: 18, height: 18 }} />
         </View>
-        <Text style={textStyle(14, textColor(), "600")}>Zeedle</Text>
+        <Text style={textStyle(13, textColor(), "600")}>Zeedle</Text>
         <View style={{ flex: 1 }} />
-        <View onPress={() => { const next = !light(); followSystem.set(false); setColorScheme(next ? "light" : "dark"); void Storage.setItem("zeedle.light-theme", String(next)); }} style={{ width: 38, height: 40, alignItems: "center", justifyContent: "center" }}>
-          <LucideIcon name={light() ? "sun" : "moon"} size={18} color={light() ? "#d19a32" : secondaryColor()} />
+          <View
+            testID="theme-toggle"
+            accessibilityLabel={t("Toggle theme", "切换主题")}
+            disabled={followSystem()}
+            disabledStyle={{ opacity: 0.4 }}
+            hoverStyle={{ backgroundColor: hoverColor() }}
+            onPress={() => {
+              if (followSystem()) return;
+              const next = !light();
+              setColorScheme(next ? "light" : "dark");
+              void Storage.setItem("zeedle.light-theme", String(next));
+            }}
+            style={{ width: 42, height: 40, alignItems: "center", justifyContent: "center" }}
+          >
+          <LucideIcon name={light() ? "sun" : "moon"} size={18} color={secondaryColor()} />
         </View>
         {titleBar().right === 0 ? (
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <View style={{ width: 1, height: 18, backgroundColor: lineColor() }} />
-            <View onPress={() => Window.minimize()} style={{ width: 42, height: 40, alignItems: "center", justifyContent: "center" }}>
-              <LucideIcon name="minus" size={15} color={secondaryColor()} />
+            <View style={{ width: 1, height: 16, backgroundColor: dividerColor() }} />
+            <View onPress={() => Window.minimize()} hoverStyle={{ backgroundColor: hoverColor() }} style={{ width: 42, height: 40, alignItems: "center", justifyContent: "center" }}>
+            <LucideIcon name="minus" size={18} color={secondaryColor()} />
             </View>
-            <View onPress={() => Window.toggleMaximize()} style={{ width: 42, height: 40, alignItems: "center", justifyContent: "center" }}>
-              <LucideIcon name="square" size={13} color={secondaryColor()} />
+            <View onPress={() => Window.toggleMaximize()} hoverStyle={{ backgroundColor: hoverColor() }} style={{ width: 42, height: 40, alignItems: "center", justifyContent: "center" }}>
+            <LucideIcon name="square" size={12} color={secondaryColor()} />
             </View>
-            <View onPress={() => Window.close()} hoverStyle={{ backgroundColor: "#c42b1c" }} style={{ width: 42, height: 40, alignItems: "center", justifyContent: "center" }}>
-              <LucideIcon name="x" size={15} color={secondaryColor()} />
+            <View onPress={() => Window.close()} hoverStyle={{ backgroundColor: "#e81123" }} style={{ width: 42, height: 40, alignItems: "center", justifyContent: "center" }}>
+              <LucideIcon name="x" size={14} color={secondaryColor()} />
             </View>
           </View>
         ) : null}
@@ -780,7 +812,7 @@ function App() {
 
       <View style={{ flex: 1, minHeight: 0, flexDirection: "row" }}>
         <View style={{ width: expanded() ? 200 : 54, backgroundColor: panelColor(), borderRightWidth: 1, borderRightColor: lineColor(), paddingTop: 9, paddingBottom: 10 }}>
-          <View testID="sidebar-toggle" onPress={() => expanded.set(!expanded())} hoverStyle={{ backgroundColor: light() ? "#e8e9ec" : palette.hover }} style={{ height: 36, marginHorizontal: 6, marginBottom: 10, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", justifyContent: expanded() ? "flex-start" : "center", gap: 12, borderRadius: 8 }}>
+          <View testID="sidebar-toggle" onPress={() => expanded.set(!expanded())} hoverStyle={{ backgroundColor: hoverColor() }} style={{ height: 36, marginHorizontal: 6, marginBottom: 10, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", justifyContent: expanded() ? "flex-start" : "center", gap: 12, borderRadius: 8 }}>
             <LucideIcon name={expanded() ? "panelLeftClose" : "panelLeftOpen"} size={18} color={secondaryColor()} />
           </View>
           <View style={{ height: 5 }} />
@@ -804,41 +836,41 @@ function App() {
           {page() === 0 ? <PlayerPanel /> : null}
           {showSpectrum() ? (
             <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 60, flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 3, opacity: 0.28, zIndex: 5 }}>
-              {spectrumBars().map((bar) => <View style={{ flex: 1, height: Math.max(2, bar * 50), marginHorizontal: 1, backgroundColor: palette.accent }} />)}
+              {spectrumBars().map((bar) => <View style={{ flex: 1, height: Math.max(2, bar * 50), marginHorizontal: 1, backgroundColor: accentColor() }} />)}
             </View>
           ) : null}
         </View>
       </View>
 
       {playerError() ? (
-        <View onPress={() => playerError.set("")} style={{ position: "absolute", right: 15, bottom: page() === 0 ? 82 : 12, maxWidth: 360, paddingHorizontal: 12, paddingVertical: 9, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: light() ? "#fff0f0" : "#422a2d", borderRadius: 7, borderWidth: 1, borderColor: palette.danger }}>
-          <LucideIcon name="circleAlert" size={16} color={palette.danger} />
-          <Text numberOfLines={2} style={textStyle(11, light() ? "#9c3438" : "#ffb6ba")}>{playerError()}</Text>
+        <View onPress={() => playerError.set("")} style={{ position: "absolute", right: 15, bottom: page() === 0 ? 82 : 12, maxWidth: 360, paddingHorizontal: 12, paddingVertical: 9, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: dangerSurfaceColor(), borderRadius: 7, borderWidth: 1, borderColor: dangerColor() }}>
+          <LucideIcon name="circleAlert" size={16} color={dangerColor()} />
+          <Text numberOfLines={2} style={textStyle(11, dangerTextColor())}>{playerError()}</Text>
         </View>
       ) : null}
 
       {editingSong() ? (
-        <View style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, zIndex: 20, alignItems: "center", justifyContent: "center", padding: 10, backgroundColor: "#00000088" }}>
-          <View style={{ width: 520, height: 450, maxWidth: "96%", maxHeight: "96%", padding: 16, borderRadius: 10, borderWidth: 1, borderColor: lineColor(), backgroundColor: pageColor(), gap: 8 }}>
-            <Text style={textStyle(20, textColor(), "700")}>{t("Edit song metadata", "编辑歌曲元信息")}</Text>
+        <View style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, zIndex: 20, alignItems: "center", justifyContent: "center", padding: 10 }}>
+          <View style={{ width: 520, height: 450, maxWidth: "96%", maxHeight: "96%", paddingHorizontal: 16, paddingTop: 14, paddingBottom: 16, borderRadius: 8, borderWidth: 1, borderColor: lineColor(), backgroundColor: pageColor(), gap: 7.5 }}>
+            <Text style={textStyle(18, textColor(), "600")}>{t("Edit song metadata", "编辑歌曲元信息")}</Text>
             <View style={{ gap: 4 }}>
-              <Text style={textStyle(13, secondaryColor())}>{t("Song title", "歌曲名")}</Text>
+              <Text style={textStyle(14, secondaryColor())}>{t("Song title", "歌曲名")}</Text>
               <Input testID="edit-title" value={editTitle()} onChange={editTitle.set} style={{ height: 32, paddingHorizontal: 10, borderWidth: 1, borderColor: lineColor(), borderRadius: 4, color: textColor(), backgroundColor: raisedColor(), fontSize: 14 }} />
             </View>
             <View style={{ flexDirection: "row", gap: 12 }}>
               <View style={{ flex: 1, gap: 4 }}>
-                <Text style={textStyle(13, secondaryColor())}>{t("Artist", "艺术家")}</Text>
+                <Text style={textStyle(14, secondaryColor())}>{t("Artist", "艺术家")}</Text>
                 <Input testID="edit-artist" value={editArtist()} onChange={editArtist.set} style={{ height: 32, paddingHorizontal: 10, borderWidth: 1, borderColor: lineColor(), borderRadius: 4, color: textColor(), backgroundColor: raisedColor(), fontSize: 14 }} />
               </View>
               <View style={{ flex: 1, gap: 4 }}>
-                <Text style={textStyle(13, secondaryColor())}>{t("Album", "专辑")}</Text>
+                <Text style={textStyle(14, secondaryColor())}>{t("Album", "专辑")}</Text>
                 <Input testID="edit-album" value={editAlbum()} onChange={editAlbum.set} style={{ height: 32, paddingHorizontal: 10, borderWidth: 1, borderColor: lineColor(), borderRadius: 4, color: textColor(), backgroundColor: raisedColor(), fontSize: 14 }} />
               </View>
             </View>
-            <View style={{ flex: 1, minHeight: 0, flexDirection: "row", gap: 12 }}>
-              <View style={{ flex: 1, minWidth: 0, padding: 10, gap: 7, borderWidth: 1, borderColor: lineColor(), borderRadius: 8, backgroundColor: panelColor() }}>
-                <Text style={textStyle(15, textColor(), "700")}>{t("Album cover", "专辑封面")}</Text>
-                <View style={{ flex: 1, alignItems: "center", justifyContent: "center", minHeight: 0 }}>
+            <View style={{ height: 200, minHeight: 200, marginTop: -1, flexDirection: "row", gap: 10 }}>
+              <View style={{ flex: 1, minWidth: 0, paddingLeft: 8, paddingRight: 10, paddingTop: 8, paddingBottom: 10, gap: 6, borderWidth: 1, borderColor: lineColor(), borderRadius: 8, backgroundColor: panelColor() }}>
+                <Text style={textStyle(14, textColor(), "600")}>{t("Album cover", "专辑封面")}</Text>
+                <View style={{ marginTop: -1, flexDirection: "row", alignItems: "flex-start", minHeight: 0 }}>
                   <Image src={editCoverPreview()} style={{ width: 100, height: 100 }} />
                 </View>
                 <View onPress={() => void chooseEditCover()} style={{ height: 32, alignItems: "center", justifyContent: "center", borderRadius: 4, backgroundColor: raisedColor() }}>
@@ -846,10 +878,12 @@ function App() {
                 </View>
                 <Text style={textStyle(11, mutedColor())}>{editCoverPath() ? editCoverName() : t("Existing cover will be kept", "将保留现有封面")}</Text>
               </View>
-              <View style={{ flex: 1, minWidth: 0, padding: 10, gap: 7, borderWidth: 1, borderColor: lineColor(), borderRadius: 8, backgroundColor: panelColor() }}>
-                <Text style={textStyle(15, textColor(), "700")}>{t("Lyrics", "歌词")}</Text>
-                <Scroll style={{ flex: 1, minHeight: 0, padding: 8, borderRadius: 4, backgroundColor: raisedColor() }}>
-                  <Text numberOfLines={6} style={textStyle(10, textColor())}>{editLyricsPreview() || t("No embedded lyrics", "没有内嵌歌词")}</Text>
+              <View style={{ flex: 1, minWidth: 0, paddingHorizontal: 10, paddingTop: 8, paddingBottom: 10, gap: 6, borderWidth: 1, borderColor: lineColor(), borderRadius: 8, backgroundColor: panelColor() }}>
+                <Text style={textStyle(14, textColor(), "600")}>{t("Lyrics", "歌词")}</Text>
+                <Scroll style={{ height: 100, minHeight: 100, marginTop: -1, padding: 8, borderRadius: 4, backgroundColor: raisedColor() }}>
+                  {(editLyricsPreview() || t("No embedded lyrics", "没有内嵌歌词")).split(/\r?\n/).map((line) => (
+                    <Text numberOfLines={1} ellipsizeMode="clip" style={{ ...textStyle(11, textColor()), lineHeight: 13 }}>{line}</Text>
+                  ))}
                 </Scroll>
                 <View onPress={() => void chooseEditLyrics()} style={{ height: 32, alignItems: "center", justifyContent: "center", borderRadius: 4, backgroundColor: raisedColor() }}>
                   <Text style={textStyle(13, textColor())}>{t("Select LRC file", "选择 LRC 歌词文件")}</Text>
@@ -857,13 +891,14 @@ function App() {
                 <Text style={textStyle(11, mutedColor())}>{editLyricsPath() ? editLyricsName() : t("Existing lyrics will be kept", "将保留现有歌词")}</Text>
               </View>
             </View>
-            {editError() ? <Text style={textStyle(11, palette.danger)}>{editError()}</Text> : null}
+            {editError() ? <Text style={textStyle(11, dangerColor())}>{editError()}</Text> : null}
+            <View style={{ flex: 1 }} />
             <View style={{ height: 1, backgroundColor: lineColor() }} />
             <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8 }}>
-              <View testID="edit-cancel" onPress={() => editingSong.set(null)} style={{ paddingHorizontal: 14, height: 32, justifyContent: "center", borderRadius: 4, backgroundColor: raisedColor() }}>
+              <View testID="edit-cancel" onPress={() => editingSong.set(null)} style={{ width: 68, height: 32, alignItems: "center", justifyContent: "center", borderRadius: 4, backgroundColor: raisedColor() }}>
                 <Text style={textStyle(13, textColor())}>{t("Cancel", "取消")}</Text>
               </View>
-              <View onPress={() => void saveEdit()} style={{ paddingHorizontal: 16, height: 32, justifyContent: "center", borderRadius: 4, backgroundColor: light() ? "#e4e4e4" : "#3b3b3b", opacity: editSaving() ? 0.65 : 1 }}>
+              <View onPress={() => void saveEdit()} style={{ width: 55, height: 32, alignItems: "center", justifyContent: "center", borderRadius: 4, backgroundColor: buttonColor(), opacity: editSaving() ? 0.65 : 1 }}>
                 <Text style={textStyle(13, textColor(), "500")}>{editSaving() ? t("Saving…", "正在保存…") : t("Save", "保存")}</Text>
               </View>
             </View>
@@ -872,7 +907,7 @@ function App() {
       ) : null}
 
       {deleteTarget() ? (
-        <View style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, zIndex: 21, alignItems: "center", justifyContent: "center", padding: 20, backgroundColor: "#00000088" }}>
+        <View style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, zIndex: 21, alignItems: "center", justifyContent: "center", padding: 20 }}>
           <View style={{ width: 370, maxWidth: "100%", padding: 20, borderRadius: 8, borderWidth: 1, borderColor: lineColor(), backgroundColor: pageColor(), gap: 11 }}>
             <Text style={textStyle(17, textColor(), "600")}>{t("Delete this song?", "删除这首歌曲？")}</Text>
             <Text style={textStyle(13, textColor(), "500")}>{deleteTarget()?.song_name}</Text>
@@ -881,8 +916,8 @@ function App() {
               <View testID="delete-cancel" onPress={() => deleteTarget.set(null)} style={{ paddingHorizontal: 13, paddingVertical: 8, borderRadius: 4, backgroundColor: raisedColor() }}>
                 <Text style={textStyle(12, secondaryColor(), "500")}>{t("Cancel", "取消")}</Text>
               </View>
-              <View onPress={() => void confirmDelete()} style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 4, backgroundColor: palette.danger }}>
-                <Text style={textStyle(12, "#ffffff", "600")}>{t("Delete song", "删除歌曲")}</Text>
+              <View onPress={() => void confirmDelete()} style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 4, backgroundColor: dangerColor() }}>
+                <Text style={textStyle(12, token("destructive-foreground"), "600")}>{t("Delete song", "删除歌曲")}</Text>
               </View>
             </View>
           </View>
