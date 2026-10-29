@@ -18,7 +18,7 @@ test("one pause click stays paused across playback state polls", async () => {
 test("repeat and shuffle replace each other and toggle back to order", async () => {
   const app = await open("./App.tsx", { width: 900, height: 510, platform: "windows" });
   await app.wait(100);
-  for (const [button, expected] of [["control-shuffle", "random"], ["control-repeat", "repeat"], ["control-shuffle", "random"], ["control-shuffle", "order"], ["control-repeat", "repeat"], ["control-repeat", "order"]]) {
+  for (const [button, expected] of [["control-repeat", "repeat"], ["control-repeat", "order"], ["control-shuffle", "random"], ["control-repeat", "order"], ["control-shuffle", "random"]]) {
     await app.press(`id:${button}`);
     await app.waitUntil(() => app.storage()["zeedle.play-mode"] === expected);
   }

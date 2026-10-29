@@ -859,8 +859,8 @@ function App() {
             </View>
           </View>
           <View style={{ width: "6%", flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
-            <View testID="control-repeat" accessibilityLabel={t("Repeat current track", "单曲循环")} accessibilityState={{ selected: mode() === "repeat" }} onPress={() => changeMode(mode() === "repeat" ? "order" : "repeat")} style={controlStyle(20)}>
-              <LucideIcon name={mode() === "repeat" ? "repeat2" : "repeat"} size={18} color={mode() === "repeat" ? accentColor() : secondaryColor()} />
+            <View testID="control-repeat" accessibilityLabel={t("Repeat current track", "单曲循环")} accessibilityState={{ selected: mode() !== "random" }} onPress={() => changeMode(mode() === "order" ? "repeat" : "order")} style={controlStyle(20)}>
+              <LucideIcon name={mode() === "repeat" ? "repeat2" : "repeat"} size={18} color={mode() !== "random" ? accentColor() : secondaryColor()} />
             </View>
           </View>
           <View style={{ width: "6%", flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
@@ -873,7 +873,7 @@ function App() {
             <PlayerTransportButton testID="control-next" label={t("Next track", "下一首")} name="skipForward" color={secondaryColor()} onPress={playNext} radius={8} />
           </View>
           <View style={{ width: "6%", flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
-            <View testID="control-shuffle" accessibilityLabel={t("Shuffle", "随机播放")} accessibilityState={{ selected: mode() === "random" }} onPress={() => changeMode(mode() === "random" ? "order" : "random")} style={controlStyle(20)}>
+            <View testID="control-shuffle" accessibilityLabel={t("Shuffle", "随机播放")} accessibilityState={{ selected: mode() === "random" }} onPress={() => changeMode("random")} style={controlStyle(20)}>
               <LucideIcon name="shuffle" size={18} color={mode() === "random" ? accentColor() : secondaryColor()} />
             </View>
           </View>

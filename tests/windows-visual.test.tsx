@@ -22,7 +22,7 @@ test("Windows transport controls stay centered and pause remains stable", async 
   await app.press("id:control-shuffle");
   await app.screenshot("target/windows-mode-random.png");
   await app.press("id:control-repeat");
-  await app.screenshot("target/windows-mode-repeat.png");
+  await app.screenshot("target/windows-mode-order.png");
   await app.press("id:theme-toggle");
   for (const id of ["control-play-pause", "control-previous", "control-next"]) {
     await app.hover(`id:${id}`);
