@@ -12,7 +12,7 @@ try {
   Add-Content -LiteralPath .nsh/rust/windows-app/Cargo.toml -Value "`n[build-dependencies]`nwinresource = '=0.1.23'"
   # Copy-Item preserves mtime; force Cargo to notice the launcher replacement.
   (Get-Item -LiteralPath .nsh/rust/windows-app/main.rs).LastWriteTimeUtc = [DateTime]::UtcNow
-  cargo build --offline --release --manifest-path .nsh/rust/windows-app/Cargo.toml --target-dir target
+  cargo build --release --manifest-path .nsh/rust/windows-app/Cargo.toml --target-dir target
   if ($LASTEXITCODE -ne 0) { throw 'Windows startup host build failed' }
   Copy-Item -LiteralPath target/release/nsh-app-nsh-app-zeedle-nsh-windows-app.exe -Destination .nsh/out/Zeedle/Zeedle.exe -Force
   Add-Type -AssemblyName System.IO.Compression.FileSystem

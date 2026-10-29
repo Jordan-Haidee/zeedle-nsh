@@ -19,14 +19,17 @@ jobs:
           - name: Windows x64
             os: windows-latest
             platform: windows
+            target: windows
             arch: x86_64
           - name: Linux x64
             os: ubuntu-24.04
             platform: linux
+            target: linux
             arch: x86_64
           - name: macOS Apple Silicon
             os: macos-15
             platform: macos
+            target: macos
             arch: aarch64
 
     steps:
@@ -42,7 +45,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends \
             build-essential libasound2-dev libdbus-1-dev libfontconfig1-dev \
-            libfreetype6-dev libgtk-4-dev libxkbcommon-dev pkg-config
+            libfreetype6-dev libgtk-4-dev libwebkitgtk-6.0-dev \
+            libxkbcommon-dev pkg-config xvfb
 
       - name: Install NSH on Windows x64
         if: runner.os == 'Windows' && matrix.arch == 'x86_64'
@@ -84,6 +88,22 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: nsh package --target macos
+
+      - name: Render desktop pages and capture screenshots
+        if: runner.os != 'Linux'
+        run: nsh test tests/platform-render.test.tsx --target ${{ matrix.target }}
+
+      - name: Render desktop pages and capture screenshots on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a nsh test tests/platform-render.test.tsx --target linux
+
+      - name: Upload platform screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ matrix.platform }}-${{ matrix.arch }}
+          path: target/platform-render-*.png
+          if-no-files-found: error
+          compression-level: 0
 
       - name: Name Linux archive
         if: runner.os == 'Linux'
