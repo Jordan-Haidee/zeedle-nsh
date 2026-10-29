@@ -1,0 +1,895 @@
+import { Image, List, Scroll, Storage, Text, View, colorScheme, keymap, mount, openUrl, setColorScheme, signal } from "nsh";
+import { Input } from "nsh/base";
+import { Menu, titleBar, Window } from "nsh/desktop";
+import { Music } from "zeedle-nsh/native";
+import { LucideIcon, type LucideName } from "./icons";
+import cover from "./assets/cover.svg";
+
+type Page = 0 | 1 | 2 | 3 | 4;
+type SortField = "song_name" | "singer" | "duration_secs";
+type PlayMode = "order" | "repeat" | "random";
+type Language = "en" | "zh" | "es" | "fr" | "de" | "ru";
+type SongInfo = { id: number; song_name: string; singer: string; duration: string; duration_secs: number; song_path: string };
+type LyricItem = { time: number; duration: number; text: string };
+type PlaybackState = { position: number; duration: number; paused: boolean; volume: number; error: string; spectrum: number[] };
+const palette = {
+  page: "#141414",
+  panel: "#272727",
+  raised: "#333333",
+  hover: "#323232",
+  line: "#454545",
+  text: "#f5f5f5",
+  secondary: "#c4c4c4",
+  muted: "#a0a0a0",
+  accent: "#6cc4ff",
+  accentSoft: "#20354e",
+  white: "#ffffff",
+  danger: "#ef7378",
+};
+
+function timeLabel(seconds: number) {
+  const value = Math.max(0, Math.floor(seconds || 0));
+  return `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
+}
+
+function App() {
+  const page = signal<Page>(0);
+  const expanded = signal(false);
+  const light = () => colorScheme() === "light";
+  const followSystem = signal(false);
+  const language = signal<Language>("en");
+  const directory = signal(Music.defaultDirectory());
+  const songs = signal<SongInfo[]>([]);
+  const current = signal<SongInfo | null>(null);
+  const lyrics = signal<LyricItem[]>([]);
+  const art = signal<string | typeof cover>(cover);
+  const query = signal("");
+  const search = signal("");
+  const searchResults = signal<SongInfo[]>([]);
+  const loading = signal(false);
+  const sortField = signal<SortField>("song_name");
+  const ascending = signal(true);
+  const mode = signal<PlayMode>("order");
+  const position = signal(0);
+  const duration = signal(0);
+  const paused = signal(true);
+  const playerLoaded = signal(false);
+  const volume = signal(0.8);
+  const showSpectrum = signal(true);
+  const spectrumBars = signal<number[]>(Array.from({ length: 48 }, () => 0));
+  const playerError = signal("");
+  const trackWidth = signal(1);
+  const history = signal<string[]>([]);
+  const historyIndex = signal(-1);
+  const editingSong = signal<SongInfo | null>(null);
+  const editTitle = signal("");
+  const editArtist = signal("");
+  const editAlbum = signal("");
+  const editCoverPath = signal("");
+  const editCoverName = signal("");
+  const editCoverPreview = signal<string | typeof cover>(cover);
+  const editLyricsPath = signal("");
+  const editLyricsName = signal("");
+  const editLyricsPreview = signal("");
+  const editError = signal("");
+  const editSaving = signal(false);
+  const deleteTarget = signal<SongInfo | null>(null);
+  let handledEnd = false;
+
+  const t = (english: string, chinese: string) => language() === "zh" ? chinese : english;
+
+  Window.setTitle("Zeedle");
+  Window.setTitleBar("hidden", 40);
+  Window.setFrame({ size: { width: 900, height: 510 } });
+
+  const displayedSongs = () => {
+    const items = [...songs()];
+    const field = sortField();
+    const dir = ascending() ? 1 : -1;
+    return items.sort((a, b) => {
+      const left = a[field];
+      const right = b[field];
+      return (typeof left === "number" && typeof right === "number"
+        ? left - right
+        : String(left).localeCompare(String(right), undefined, { sensitivity: "base" })) * dir;
+    });
+  };
+
+  const searchSongs = (rawQuery = search()) => {
+    const term = rawQuery.trim().toLocaleLowerCase();
+    if (!term) return [];
+    return songs()
+      .map((song, index) => {
+        const title = song.song_name.toLocaleLowerCase();
+        const artist = song.singer.toLocaleLowerCase();
+        const score = (title === term ? 100 : title.startsWith(term) ? 80 : title.includes(term) ? 60 : 0)
+          + (artist === term ? 50 : artist.startsWith(term) ? 40 : artist.includes(term) ? 20 : 0);
+        return { song, score, index };
+      })
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score || a.index - b.index)
+      .map((entry) => entry.song);
+  };
+
+  function updateSearch(value: string) {
+    query.set(value);
+    search.set(value);
+    searchResults.set(searchSongs(value));
+  }
+
+  async function refreshSongs(path = directory()) {
+    loading.set(true);
+    playerError.set("");
+    try {
+      const result = JSON.parse(await Music.scan(path)) as SongInfo[];
+      songs.set(result);
+      searchResults.set(searchSongs(search()));
+      directory.set(path);
+      await Storage.setItem("zeedle.music-directory", path);
+      const updatedCurrent = result.find((song) => song.song_path === current()?.song_path);
+      if (updatedCurrent) current.set(updatedCurrent);
+      if (!result.length) {
+        Music.stop();
+        playerLoaded.set(false);
+        current.set(null);
+        lyrics.set([]);
+        art.set(cover);
+        position.set(0);
+        duration.set(0);
+        return;
+      }
+      const active = result.find((song) => song.song_path === current()?.song_path) ?? result[0];
+      if (!current() || !result.some((song) => song.song_path === current()?.song_path)) {
+        Music.stop();
+        playerLoaded.set(false);
+        current.set(active);
+        position.set(0);
+        duration.set(active.duration_secs);
+        paused.set(true);
+        const [lyricsJson, nextArt] = await Promise.all([Music.lyrics(active.song_path), Music.cover(active.song_path)]);
+        if (current()?.song_path === active.song_path) {
+          lyrics.set(JSON.parse(lyricsJson) as LyricItem[]);
+          art.set(nextArt || cover);
+        }
+      }
+    } catch (error) {
+      playerError.set(String(error));
+    } finally {
+      loading.set(false);
+    }
+  }
+
+  async function playSong(song: SongInfo, addHistory = true) {
+    current.set(song);
+    playerLoaded.set(true);
+    position.set(0);
+    duration.set(song.duration_secs);
+    paused.set(false);
+    playerError.set("");
+    handledEnd = false;
+    if (addHistory) {
+      const next = history().slice(0, historyIndex() + 1);
+      next.push(song.song_path);
+      history.set(next);
+      historyIndex.set(next.length - 1);
+    }
+    Music.play(song.song_path);
+    const [lyricsJson, nextArt] = await Promise.all([Music.lyrics(song.song_path), Music.cover(song.song_path)]);
+    const nextLyrics = JSON.parse(lyricsJson) as LyricItem[];
+    if (current()?.song_path === song.song_path) {
+      lyrics.set(nextLyrics);
+      art.set(nextArt || cover);
+    }
+  }
+
+  function playNext() {
+    const list = displayedSongs();
+    if (!list.length) return;
+    if (mode() === "repeat" && current()) {
+      void playSong(current()!, false);
+      return;
+    }
+    const index = list.findIndex((song) => song.song_path === current()?.song_path);
+    const nextIndex = mode() === "random"
+      ? Math.floor(Math.random() * list.length)
+      : (index + 1 + list.length) % list.length;
+    void playSong(list[nextIndex]);
+  }
+
+  function playPrevious() {
+    const previous = historyIndex() - 1;
+    if (previous >= 0) {
+      historyIndex.set(previous);
+      const song = songs().find((item) => item.song_path === history()[previous]);
+      if (song) void playSong(song, false);
+      return;
+    }
+    const list = displayedSongs();
+    if (!list.length) return;
+    const index = list.findIndex((song) => song.song_path === current()?.song_path);
+    void playSong(list[(index - 1 + list.length) % list.length]);
+  }
+
+  function togglePlay() {
+    if (!current()) {
+      const first = displayedSongs()[0];
+      if (first) void playSong(first);
+      return;
+    }
+    if (!playerLoaded()) {
+      void playSong(current()!, false);
+      return;
+    }
+    Music.toggle();
+    paused.set(!paused());
+  }
+
+  function seekTo(seconds: number) {
+    const next = Math.max(0, Math.min(duration(), seconds));
+    position.set(next);
+    Music.seek(next);
+  }
+
+  function seekBy(seconds: number) {
+    if (page() === 2 && lyrics().length) {
+      const target = seconds < 0
+        ? [...lyrics()].reverse().find((line) => line.time < position() - 0.5)?.time ?? 0
+        : lyrics().find((line) => line.time > position() + 0.5)?.time ?? position();
+      seekTo(target);
+    } else {
+      seekTo(position() + seconds);
+    }
+  }
+
+  keymap.bind({
+    space: togglePlay,
+    left: () => seekBy(-15),
+    right: () => seekBy(15),
+    up: playPrevious,
+    down: playNext,
+    f1: () => page.set(0),
+    f2: () => page.set(1),
+    f3: () => page.set(2),
+    f4: () => page.set(3),
+    f5: () => page.set(4),
+  }, { when: "notEditing" });
+
+  async function chooseDirectory() {
+    const path = await Music.chooseDirectory();
+    if (path) await refreshSongs(path);
+  }
+
+  async function beginEdit(song: SongInfo) {
+    editingSong.set(song);
+    editTitle.set(song.song_name);
+    editArtist.set(song.singer);
+    editAlbum.set("");
+    editCoverPath.set("");
+    editCoverName.set("");
+    editCoverPreview.set(cover);
+    editLyricsPath.set("");
+    editLyricsName.set("");
+    editLyricsPreview.set("");
+    editError.set("");
+    try {
+      const metadata = JSON.parse(await Music.editorMetadata(song.song_path)) as { title?: string; artist?: string; album?: string; cover?: string; lyrics?: string };
+      if (editingSong()?.song_path === song.song_path) {
+        editTitle.set(metadata.title || song.song_name);
+        editArtist.set(metadata.artist || song.singer);
+        editAlbum.set(metadata.album || "");
+        editCoverPreview.set(metadata.cover || cover);
+        editCoverName.set(metadata.cover ? t("Embedded artwork", "内嵌封面") : t("No cover image", "没有封面图片"));
+        editLyricsPreview.set(metadata.lyrics || "");
+        editLyricsName.set(metadata.lyrics ? t("Embedded lyrics", "内嵌歌词") : t("No embedded lyrics", "没有内嵌歌词"));
+      }
+    } catch (error) {
+      editError.set(String(error));
+    }
+  }
+
+  async function chooseEditCover() {
+    const path = await Music.chooseCover();
+    if (!path) return;
+    const preview = await Music.coverFile(path);
+    if (!preview) { editError.set(t("Could not read that image file.", "无法读取该图片文件。")); return; }
+    editCoverPath.set(path);
+    editCoverName.set(path.split(/[\\/]/).pop() || path);
+    editCoverPreview.set(preview);
+    editError.set("");
+  }
+
+  async function chooseEditLyrics() {
+    const path = await Music.chooseLyrics();
+    if (!path) return;
+    const text = await Music.lyricsFile(path);
+    if (!text) { editError.set(t("Could not read that LRC file.", "无法读取该 LRC 文件。")); return; }
+    editLyricsPath.set(path);
+    editLyricsName.set(path.split(/[\\/]/).pop() || path);
+    editLyricsPreview.set(text);
+    editError.set("");
+  }
+
+  async function saveEdit() {
+    const song = editingSong();
+    if (!song || editSaving()) return;
+    if (!editTitle().trim() || !editArtist().trim()) {
+      editError.set("Title and artist are required.");
+      return;
+    }
+    editSaving.set(true);
+    editError.set("");
+    try {
+      const error = await Music.updateMetadata(song.song_path, editTitle(), editArtist(), editAlbum(), editCoverPath(), editLyricsPath());
+      if (error) { editError.set(error); return; }
+      editingSong.set(null);
+      await refreshSongs();
+    } catch (error) {
+      editError.set(String(error));
+    } finally {
+      editSaving.set(false);
+    }
+  }
+
+  async function confirmDelete() {
+    const song = deleteTarget();
+    if (!song) return;
+    const error = await Music.deleteSong(song.song_path);
+    deleteTarget.set(null);
+    if (error) { playerError.set(error); return; }
+    await refreshSongs();
+  }
+
+  void (async () => {
+    const [savedDirectory, savedTheme, savedVolume, savedMode, savedSpectrum, savedLanguage] = await Promise.all([
+      Storage.getItem("zeedle.music-directory"),
+      Storage.getItem("zeedle.light-theme"),
+      Storage.getItem("zeedle.volume"),
+      Storage.getItem("zeedle.play-mode"),
+      Storage.getItem("zeedle.show-spectrum"),
+      Storage.getItem("zeedle.language"),
+    ]);
+    if (savedTheme !== null) { followSystem.set(false); setColorScheme(savedTheme === "true" ? "light" : "dark"); }
+    else { followSystem.set(false); setColorScheme("dark"); }
+    if (savedVolume !== null) {
+      const parsed = Number(savedVolume);
+      if (Number.isFinite(parsed)) volume.set(Math.max(0, Math.min(1, parsed)));
+    }
+    if (savedMode === "repeat" || savedMode === "random") mode.set(savedMode);
+    Music.setVolume(volume());
+    if (savedSpectrum !== null) showSpectrum.set(savedSpectrum === "true");
+    if (savedLanguage === "zh" || savedLanguage === "es" || savedLanguage === "fr" || savedLanguage === "de" || savedLanguage === "ru") language.set(savedLanguage);
+    Music.setSpectrumEnabled(showSpectrum());
+    await refreshSongs(savedDirectory || directory());
+  })();
+
+  setInterval(() => {
+    const state = JSON.parse(Music.state()) as PlaybackState;
+    position.set(state.position);
+    if (state.duration > 0) duration.set(state.duration);
+    paused.set(state.paused);
+    if (state.error) playerError.set(state.error);
+    volume.set(state.volume);
+    spectrumBars.set(state.spectrum);
+    if (!state.paused && state.duration > 0 && state.position >= state.duration - 0.12 && !handledEnd) {
+      handledEnd = true;
+      playNext();
+    }
+  }, 120);
+
+  const textColor = () => light() ? "#1f2024" : palette.text;
+  const secondaryColor = () => light() ? "#666970" : palette.secondary;
+  const mutedColor = () => light() ? "#858991" : palette.muted;
+  const panelColor = () => light() ? "#f5f5f6" : palette.panel;
+  const raisedColor = () => light() ? "#ffffff" : palette.raised;
+  const lineColor = () => light() ? "#dedfe2" : palette.line;
+  const pageColor = () => light() ? "#ffffff" : palette.page;
+
+  const textStyle = (size = 13, color = textColor(), weight: "400" | "500" | "600" | "700" = "400") => ({
+    fontSize: size,
+    color,
+    fontWeight: weight,
+    fontFamily: "Segoe UI, Microsoft YaHei UI, sans-serif",
+  });
+
+  const controlStyle = (size = 36) => ({
+    width: size,
+    height: size,
+    borderRadius: 9,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    backgroundColor: "transparent",
+  });
+
+  function SideButton(props: { icon: LucideName; label: string; target: Page }) {
+    const selected = () => page() === props.target;
+    return (
+      <View
+        testID={`nav-${props.target}`}
+        accessibilityLabel={props.label}
+        onPress={() => page.set(props.target)}
+        hoverStyle={{ backgroundColor: light() ? "#e8e9ec" : palette.hover }}
+        activeStyle={{ opacity: 0.72 }}
+        style={{
+          height: 38,
+          marginBottom: 5,
+          marginHorizontal: 6,
+          paddingHorizontal: expanded() ? 12 : 0,
+          gap: expanded() ? 12 : 0,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: expanded() ? "flex-start" : "center",
+          borderRadius: 8,
+          backgroundColor: selected() ? (light() ? "#e8e9ec" : palette.hover) : "transparent",
+          borderLeftWidth: selected() ? 2 : 0,
+          borderLeftColor: palette.accent,
+        }}
+      >
+        <LucideIcon name={props.icon} size={18} color={selected() ? palette.accent : secondaryColor()} />
+        {expanded() ? <Text style={textStyle(13, selected() ? textColor() : secondaryColor(), selected() ? "600" : "400")}>{props.label}</Text> : null}
+      </View>
+    );
+  }
+
+  function SongRows(props: { items: SongInfo[] }) {
+    return (
+      <List
+        each={props.items}
+        keyExtractor={(song) => song.song_path}
+        estimatedItemSize={30}
+        style={{ flex: 1, backgroundColor: pageColor() }}
+        contentStyle={{ paddingBottom: 0 }}
+        empty={
+          <View style={{ flex: 1, minHeight: 220, alignItems: "center", justifyContent: "center", gap: 8 }}>
+            <LucideIcon name="search" size={24} color={mutedColor()} />
+            <Text style={textStyle(13, mutedColor())}>{loading() ? t("Reading your music library…", "正在读取音乐库…") : t("No songs found in this folder", "此文件夹中没有歌曲")}</Text>
+            <Text style={textStyle(12, mutedColor())}>{t("Choose a folder with MP3, FLAC, WAV or OGG files", "选择包含 MP3、FLAC、WAV 或 OGG 文件的文件夹")}</Text>
+          </View>
+        }
+      >
+        {(item) => {
+          const isPlaying = () => current()?.song_path === item().song_path;
+          const hovered = signal(false);
+          const openActions = () => {
+            const selected = item();
+            void Menu.popup([
+              { label: t("Edit metadata…", "编辑元数据…"), onSelect: () => void beginEdit(selected) },
+              { type: "separator" },
+              { label: t("Delete song…", "删除歌曲…"), onSelect: () => deleteTarget.set(selected) },
+            ]);
+          };
+          return (
+            <View
+              testID={`song-row-${item().id}`}
+              accessibilityLabel={item().song_name}
+              onPress={() => void playSong(item())}
+              onLongPress={openActions}
+              onContextMenu={() => openActions()}
+              onHoverIn={() => hovered.set(true)}
+              onHoverOut={() => hovered.set(false)}
+              activeStyle={{ backgroundColor: light() ? "#e8e8e8" : "#323232" }}
+              style={{
+                height: 30,
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: isPlaying() ? (light() ? "#e8e8e8" : "#323232") : hovered() ? (light() ? "#e8e8e8" : "#252525") : "transparent",
+              }}
+            >
+              <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                <Text numberOfLines={1} style={textStyle(15, isPlaying() ? palette.accent : textColor(), isPlaying() ? "600" : "400")}>{item().song_name}</Text>
+              </View>
+              <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 }}>
+                <Text numberOfLines={1} style={textStyle(15, isPlaying() ? palette.accent : textColor())}>{item().singer}</Text>
+              </View>
+              <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                <Text style={textStyle(15, isPlaying() ? palette.accent : textColor())}>{item().duration}</Text>
+              </View>
+            </View>
+          );
+        }}
+      </List>
+    );
+  }
+
+  function GalleryPage() {
+    return (
+      <View testID="screen-0" style={{ flex: 1, minHeight: 0, backgroundColor: pageColor() }}>
+        <View style={{ height: 30, flexDirection: "row", alignItems: "center" }}>
+          <View onPress={() => { if (sortField() === "song_name") ascending.set(!ascending()); else { sortField.set("song_name"); ascending.set(true); } }} style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 }}>
+            <Text style={textStyle(15, secondaryColor())}>{t("Title", "标题")}</Text>
+            {sortField() === "song_name" ? <LucideIcon name={ascending() ? "arrowUp" : "arrowDown"} size={14} color={secondaryColor()} /> : null}
+          </View>
+          <View onPress={() => { if (sortField() === "singer") ascending.set(!ascending()); else { sortField.set("singer"); ascending.set(true); } }} style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 }}>
+            <Text style={textStyle(15, secondaryColor())}>{t("Artist", "艺术家")}</Text>
+            {sortField() === "singer" ? <LucideIcon name={ascending() ? "arrowUp" : "arrowDown"} size={14} color={secondaryColor()} /> : null}
+          </View>
+          <View onPress={() => { if (sortField() === "duration_secs") ascending.set(!ascending()); else { sortField.set("duration_secs"); ascending.set(true); } }} style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 }}>
+            <Text style={textStyle(15, secondaryColor())}>{t("Duration", "时长")}</Text>
+            {sortField() === "duration_secs" ? <LucideIcon name={ascending() ? "arrowUp" : "arrowDown"} size={14} color={secondaryColor()} /> : null}
+          </View>
+        </View>
+        <SongRows items={displayedSongs()} />
+      </View>
+    );
+  }
+
+  function SearchPage() {
+    return (
+      <View testID="screen-1" style={{ flex: 1, minHeight: 0, backgroundColor: pageColor() }}>
+        <View style={{ marginHorizontal: 12, marginTop: 7, marginBottom: 8, height: 26, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 3, borderBottomWidth: 2, borderBottomColor: palette.accent, backgroundColor: raisedColor() }}>
+          <LucideIcon name="search" size={17} color={mutedColor()} />
+          <Input
+            testID="song-search"
+            value={query()}
+            placeholder={t("Search songs or artists...", "搜索歌曲或艺术家…")}
+            onChange={updateSearch}
+            style={{ flex: 1, height: 22, color: textColor(), fontSize: 13, backgroundColor: "transparent" }}
+          />
+          {query() ? <View onPress={() => updateSearch("")} style={{ padding: 3 }}><LucideIcon name="x" size={14} color={mutedColor()} /></View> : null}
+        </View>
+        {search() ? <Text style={{ ...textStyle(13, secondaryColor()), marginHorizontal: 12, marginBottom: 5 }}>{language() === "zh" ? `找到 ${searchResults().length} 个结果` : `${searchResults().length} result(s) found`}</Text> : null}
+        {search() ? <SongRows items={searchResults()} /> : (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 9 }}>
+            <LucideIcon name="search" size={32} color={mutedColor()} />
+            <Text style={textStyle(13, secondaryColor())}>{t("Type to search your music", "输入关键词开始搜索")}</Text>
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  function LyricsPage() {
+    const panelHeight = signal(470);
+    const albumSize = () => Math.max(120, panelHeight() * 0.4);
+    return (
+      <View testID="screen-2" onLayout={(event) => panelHeight.set(event.size.height)} style={{ flex: 1, minHeight: 0, flexDirection: "row", backgroundColor: pageColor() }}>
+        <View style={{ width: lyrics().length ? "30%" : "100%", padding: 20, alignItems: "center", justifyContent: "center" }}>
+          <View style={{ width: albumSize(), height: albumSize(), maxWidth: "100%", borderRadius: 9, overflow: "hidden", backgroundColor: raisedColor(), boxShadow: light() ? "0 12px 28px #00000018" : "0 12px 28px #00000055" }}>
+            <Image src={art()} style={{ width: "100%", height: "100%" }} />
+          </View>
+          <View style={{ width: albumSize(), marginTop: 5, gap: 3 }}>
+            <Text numberOfLines={1} style={textStyle(15, textColor())}>{t("Artist:", "艺术家：")} {current()?.singer ?? t("Unknown", "未知")}</Text>
+            <Text numberOfLines={1} style={textStyle(15, textColor())}>{t("Title:", "歌曲：")} {current()?.song_name ?? t("No song", "无歌曲")}</Text>
+          </View>
+        </View>
+        {lyrics().length ? (
+          <List each={lyrics()} keyExtractor={(line) => String(line.time)} estimatedItemSize={40} style={{ width: "70%", flex: 1 }} contentStyle={{ paddingTop: 4, paddingBottom: 12 }}>
+            {(line) => {
+              const active = () => position() >= line().time && position() < line().time + line().duration;
+              return (
+                <View onPress={() => seekTo(line().time)} style={{ height: 40, alignItems: "center", justifyContent: "center" }}>
+                  <Text numberOfLines={1} style={textStyle(active() ? 20 : 17, active() ? palette.accent : textColor(), active() ? "600" : "400")}>{line().text}</Text>
+                </View>
+              );
+            }}
+          </List>
+        ) : null}
+      </View>
+    );
+  }
+
+  function SettingsPage() {
+    const cardStyle = {
+      padding: 16,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: light() ? "#d7d7d7" : "#474747",
+      backgroundColor: panelColor(),
+      gap: 11,
+    };
+    const sectionStyle = textStyle(12, secondaryColor(), "700");
+    const divider = <View style={{ height: 1, backgroundColor: light() ? "#d1d1d1" : "#414141" }} />;
+    const changeFollowSystem = () => {
+      const next = !followSystem();
+      followSystem.set(next);
+      if (next) {
+        setColorScheme("system");
+        void Storage.removeItem("zeedle.light-theme");
+      } else {
+        void Storage.setItem("zeedle.light-theme", String(light()));
+      }
+    };
+    const changeSpectrum = () => {
+      const next = !showSpectrum();
+      showSpectrum.set(next);
+      Music.setSpectrumEnabled(next);
+      void Storage.setItem("zeedle.show-spectrum", String(next));
+    };
+    const checkbox = (checked: boolean, onPress: () => void) => (
+      <View
+        onPress={onPress}
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: 2,
+          borderWidth: checked ? 0 : 1,
+          borderColor: light() ? "#888888" : "#9b9b9b",
+          backgroundColor: checked ? palette.accent : "transparent",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {checked ? <LucideIcon name="check" size={15} color="#ffffff" /> : null}
+      </View>
+    );
+
+    return (
+      <View testID="screen-3" style={{ flex: 1, minHeight: 0, backgroundColor: pageColor() }}>
+      <Scroll testID="settings-scroll" style={{ flex: 1, backgroundColor: pageColor() }} contentStyle={{ padding: 24, gap: 20 }}>
+        <View style={cardStyle}>
+          <Text style={sectionStyle}>{t("Playback", "播放")}</Text>
+          {divider}
+          <Text style={textStyle(13, secondaryColor())}>{t("Music directory", "音乐文件夹")}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <View style={{ flex: 1, minWidth: 0, height: 32, justifyContent: "center", paddingHorizontal: 12, borderRadius: 4, borderWidth: 1, borderColor: light() ? "#d0d0d0" : "#414141", backgroundColor: raisedColor() }}>
+              <Text numberOfLines={1} style={textStyle(13, secondaryColor())}>{directory()}</Text>
+            </View>
+            <View onPress={() => void chooseDirectory()} style={{ paddingHorizontal: 12, height: 32, flexDirection: "row", alignItems: "center", justifyContent: "center", borderRadius: 4, backgroundColor: light() ? "#e9e9e9" : "#3b3b3b" }}>
+              <Text style={textStyle(13, textColor(), "500")}>{t("Browse…", "浏览…")}</Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            {checkbox(showSpectrum(), changeSpectrum)}
+            <Text onPress={changeSpectrum} style={textStyle(13, textColor())}>{t("Spectrum display", "频谱显示")}</Text>
+          </View>
+        </View>
+        <View style={cardStyle}>
+          <Text style={sectionStyle}>{t("Appearance", "外观")}</Text>
+          {divider}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            {checkbox(followSystem(), changeFollowSystem)}
+            <Text onPress={changeFollowSystem} style={textStyle(13, textColor())}>{t("Follow system theme", "跟随系统主题")}</Text>
+          </View>
+          <View style={{ gap: 6 }}>
+            <Text style={textStyle(13, secondaryColor())}>{t("Language", "语言")}</Text>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              {[
+                { code: "en", label: "English" },
+                { code: "zh", label: "中文" },
+                { code: "es", label: "Español" },
+                { code: "fr", label: "Français" },
+                { code: "de", label: "Deutsch" },
+                { code: "ru", label: "Русский" },
+              ].map((option) => (
+                <View
+                  testID={`language-${option.code}`}
+                  onPress={() => {
+                    language.set(option.code as Language);
+                    void Storage.setItem("zeedle.language", option.code);
+                  }}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    height: 26,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 4,
+                    borderWidth: 1,
+                    borderColor: language() === option.code ? palette.accent : (light() ? "#d0d0d0" : "#414141"),
+                    backgroundColor: language() === option.code ? palette.accent : (light() ? "#e5e5e5" : "#333333"),
+                  }}
+                >
+                  <Text numberOfLines={1} style={textStyle(11, language() === option.code ? "#ffffff" : textColor())}>{option.label}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Scroll>
+      </View>
+    );
+  }
+
+  function AboutPage() {
+    return (
+      <View testID="screen-4" style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: pageColor(), gap: 12 }}>
+        <View style={{ width: 88, height: 88, borderRadius: 18, overflow: "hidden", boxShadow: light() ? "0 10px 24px #00000016" : "0 10px 24px #00000044" }}>
+          <Image src={cover} style={{ width: "100%", height: "100%" }} />
+        </View>
+        <Text style={textStyle(22, textColor(), "600")}>Zeedle</Text>
+        <Text style={{ ...textStyle(12, secondaryColor()), textAlign: "center", maxWidth: 390 }}>{t("Music at the speed of a blink, designed for pure simplicity.", "轻快简洁的音乐播放器。")}</Text>
+        <Text style={textStyle(11, mutedColor())}>{t("Version 0.6.5 · Built with Rust and Native Shell", "版本 0.6.5 · 使用 Rust 和 Native Shell 构建")}</Text>
+        <Text onPress={() => void openUrl("https://github.com/Jordan-Haidee/Zeedle")} style={textStyle(12, palette.accent, "500")}>{t("Project information", "项目信息")}</Text>
+      </View>
+    );
+  }
+
+  function PlayerPanel() {
+    const progressPercent = () => duration() > 0 ? Math.max(0, Math.min(100, (position() / duration()) * 100)) : 0;
+    return (
+      <View style={{ height: 72, minHeight: 72, backgroundColor: pageColor() }}>
+        <View
+          onLayout={(event) => trackWidth.set(event.size.width)}
+          onPress={(event) => seekTo(Math.max(0, Math.min(1, (event?.position.x ?? 0) / trackWidth())) * duration())}
+          style={{ height: 4, marginHorizontal: 10, backgroundColor: light() ? "#dddddd" : "#2a2a2a", justifyContent: "center" }}
+        >
+          <View style={{ height: 3, width: `${progressPercent()}%`, backgroundColor: palette.accent }} />
+          <View style={{ position: "absolute", left: `${progressPercent()}%`, top: -6, marginLeft: -7, width: 14, height: 14, borderRadius: 7, borderWidth: 3, borderColor: light() ? "#e8e8e8" : "#3b3b3b", backgroundColor: palette.accent }} />
+        </View>
+        <View style={{ height: 68, flexDirection: "row", alignItems: "center", paddingHorizontal: 0 }}>
+          <View style={{ width: "35%", flexDirection: "row", alignItems: "center" }} onPress={() => page.set(2)}>
+            <View style={{ width: "20%", alignItems: "center", justifyContent: "center" }}>
+              <View style={{ width: 40, height: 40, borderRadius: 4, overflow: "hidden" }}>
+                <Image src={art()} style={{ width: 40, height: 40 }} />
+              </View>
+            </View>
+            <View style={{ width: "80%", paddingHorizontal: 5 }}>
+              <Text numberOfLines={1} style={{ ...textStyle(14, textColor()), textAlign: "center" }}>
+                {current() ? `${current()!.song_name} - ${current()!.singer}` : t("No song selected", "尚未选择歌曲")}
+              </Text>
+            </View>
+          </View>
+          <View style={{ width: "30%", flexDirection: "row", alignItems: "center", justifyContent: "space-around" }}>
+            <View accessibilityLabel={t("Repeat current track", "单曲循环")} onPress={() => mode.set(mode() === "order" ? "repeat" : mode() === "repeat" ? "order" : mode())} style={controlStyle(30)}>
+              <LucideIcon name={mode() === "repeat" ? "repeat2" : "repeat"} size={17} color={mode() === "order" ? secondaryColor() : palette.accent} />
+            </View>
+            <View accessibilityLabel={t("Previous track", "上一首")} onPress={playPrevious} style={controlStyle(30)}>
+              <LucideIcon name="skipBack" size={23} color={secondaryColor()} />
+            </View>
+            <View accessibilityLabel={paused() ? t("Play", "播放") : t("Pause", "暂停")} onPress={togglePlay} style={controlStyle(34)}>
+              <LucideIcon name={paused() ? "play" : "pause"} size={20} color={palette.accent} />
+            </View>
+            <View accessibilityLabel={t("Next track", "下一首")} onPress={playNext} style={controlStyle(30)}>
+              <LucideIcon name="skipForward" size={23} color={secondaryColor()} />
+            </View>
+            <View accessibilityLabel={t("Shuffle", "随机播放")} onPress={() => mode.set(mode() === "random" ? "order" : "random")} style={controlStyle(30)}>
+              <LucideIcon name="shuffle" size={17} color={mode() === "random" ? palette.accent : secondaryColor()} />
+            </View>
+          </View>
+          <View style={{ width: "25%", alignItems: "center", justifyContent: "center" }}>
+            <Text style={textStyle(15, textColor())}>{timeLabel(position())} / {timeLabel(duration())}</Text>
+          </View>
+          <View style={{ width: "10%", alignItems: "center", justifyContent: "center" }}>
+            <View accessibilityLabel={t("Mute", "静音")} onPress={() => { const next = volume() > 0 ? 0 : 0.8; volume.set(next); Music.setVolume(next); void Storage.setItem("zeedle.volume", String(next)); }} style={{ width: 28, height: 30, alignItems: "center", justifyContent: "center" }}>
+              <LucideIcon name="volume2" size={18} color={secondaryColor()} />
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1, flexDirection: "column", backgroundColor: pageColor(), borderWidth: 1, borderColor: lineColor(), overflow: "hidden" }}>
+      <View
+        desktop={{ windowDrag: true }}
+        style={{ height: titleBar().height || 40, minHeight: 40, flexDirection: "row", alignItems: "center", paddingLeft: titleBar().left + 10, paddingRight: titleBar().right + 8, backgroundColor: panelColor(), borderBottomWidth: 1, borderBottomColor: lineColor() }}
+      >
+        <View style={{ width: 18, height: 18, borderRadius: 4, overflow: "hidden", marginRight: 7 }}>
+          <Image src={cover} style={{ width: 18, height: 18 }} />
+        </View>
+        <Text style={textStyle(14, textColor(), "600")}>Zeedle</Text>
+        <View style={{ flex: 1 }} />
+        <View onPress={() => { const next = !light(); followSystem.set(false); setColorScheme(next ? "light" : "dark"); void Storage.setItem("zeedle.light-theme", String(next)); }} style={{ width: 38, height: 40, alignItems: "center", justifyContent: "center" }}>
+          <LucideIcon name={light() ? "sun" : "moon"} size={18} color={light() ? "#d19a32" : secondaryColor()} />
+        </View>
+        {titleBar().right === 0 ? (
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <View style={{ width: 1, height: 18, backgroundColor: lineColor() }} />
+            <View onPress={() => Window.minimize()} style={{ width: 42, height: 40, alignItems: "center", justifyContent: "center" }}>
+              <LucideIcon name="minus" size={15} color={secondaryColor()} />
+            </View>
+            <View onPress={() => Window.toggleMaximize()} style={{ width: 42, height: 40, alignItems: "center", justifyContent: "center" }}>
+              <LucideIcon name="square" size={13} color={secondaryColor()} />
+            </View>
+            <View onPress={() => Window.close()} hoverStyle={{ backgroundColor: "#c42b1c" }} style={{ width: 42, height: 40, alignItems: "center", justifyContent: "center" }}>
+              <LucideIcon name="x" size={15} color={secondaryColor()} />
+            </View>
+          </View>
+        ) : null}
+      </View>
+
+      <View style={{ flex: 1, minHeight: 0, flexDirection: "row" }}>
+        <View style={{ width: expanded() ? 200 : 54, backgroundColor: panelColor(), borderRightWidth: 1, borderRightColor: lineColor(), paddingTop: 9, paddingBottom: 10 }}>
+          <View testID="sidebar-toggle" onPress={() => expanded.set(!expanded())} hoverStyle={{ backgroundColor: light() ? "#e8e9ec" : palette.hover }} style={{ height: 36, marginHorizontal: 6, marginBottom: 10, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", justifyContent: expanded() ? "flex-start" : "center", gap: 12, borderRadius: 8 }}>
+            <LucideIcon name={expanded() ? "panelLeftClose" : "panelLeftOpen"} size={18} color={secondaryColor()} />
+          </View>
+          <View style={{ height: 5 }} />
+          <SideButton icon="listMusic" label={t("Gallery", "曲库")} target={0} />
+          <SideButton icon="search" label={t("Search", "搜索")} target={1} />
+          <SideButton icon="captions" label={t("Lyrics", "歌词")} target={2} />
+          <View style={{ flex: 1 }} />
+          <View style={{ height: 1, backgroundColor: lineColor(), marginHorizontal: 7, marginBottom: 8 }} />
+          <SideButton icon="settings" label={t("Settings", "设置")} target={3} />
+          <SideButton icon="circleHelp" label={t("About", "关于")} target={4} />
+        </View>
+
+        <View style={{ flex: 1, minWidth: 0, minHeight: 0, position: "relative", flexDirection: "column", backgroundColor: pageColor() }}>
+          <View style={{ flex: 1, minHeight: 0, backgroundColor: pageColor() }}>
+            {page() === 0 ? <GalleryPage /> : null}
+            {page() === 1 ? <SearchPage /> : null}
+            {page() === 2 ? <LyricsPage /> : null}
+            {page() === 3 ? <SettingsPage /> : null}
+            {page() === 4 ? <AboutPage /> : null}
+          </View>
+          {page() === 0 ? <PlayerPanel /> : null}
+          {showSpectrum() ? (
+            <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 60, flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 3, opacity: 0.28, zIndex: 5 }}>
+              {spectrumBars().map((bar) => <View style={{ flex: 1, height: Math.max(2, bar * 50), marginHorizontal: 1, backgroundColor: palette.accent }} />)}
+            </View>
+          ) : null}
+        </View>
+      </View>
+
+      {playerError() ? (
+        <View onPress={() => playerError.set("")} style={{ position: "absolute", right: 15, bottom: page() === 0 ? 82 : 12, maxWidth: 360, paddingHorizontal: 12, paddingVertical: 9, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: light() ? "#fff0f0" : "#422a2d", borderRadius: 7, borderWidth: 1, borderColor: palette.danger }}>
+          <LucideIcon name="circleAlert" size={16} color={palette.danger} />
+          <Text numberOfLines={2} style={textStyle(11, light() ? "#9c3438" : "#ffb6ba")}>{playerError()}</Text>
+        </View>
+      ) : null}
+
+      {editingSong() ? (
+        <View style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, zIndex: 20, alignItems: "center", justifyContent: "center", padding: 10, backgroundColor: "#00000088" }}>
+          <View style={{ width: 520, height: 450, maxWidth: "96%", maxHeight: "96%", padding: 16, borderRadius: 10, borderWidth: 1, borderColor: lineColor(), backgroundColor: pageColor(), gap: 8 }}>
+            <Text style={textStyle(20, textColor(), "700")}>{t("Edit song metadata", "编辑歌曲元信息")}</Text>
+            <View style={{ gap: 4 }}>
+              <Text style={textStyle(13, secondaryColor())}>{t("Song title", "歌曲名")}</Text>
+              <Input testID="edit-title" value={editTitle()} onChange={editTitle.set} style={{ height: 32, paddingHorizontal: 10, borderWidth: 1, borderColor: lineColor(), borderRadius: 4, color: textColor(), backgroundColor: raisedColor(), fontSize: 14 }} />
+            </View>
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text style={textStyle(13, secondaryColor())}>{t("Artist", "艺术家")}</Text>
+                <Input testID="edit-artist" value={editArtist()} onChange={editArtist.set} style={{ height: 32, paddingHorizontal: 10, borderWidth: 1, borderColor: lineColor(), borderRadius: 4, color: textColor(), backgroundColor: raisedColor(), fontSize: 14 }} />
+              </View>
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text style={textStyle(13, secondaryColor())}>{t("Album", "专辑")}</Text>
+                <Input testID="edit-album" value={editAlbum()} onChange={editAlbum.set} style={{ height: 32, paddingHorizontal: 10, borderWidth: 1, borderColor: lineColor(), borderRadius: 4, color: textColor(), backgroundColor: raisedColor(), fontSize: 14 }} />
+              </View>
+            </View>
+            <View style={{ flex: 1, minHeight: 0, flexDirection: "row", gap: 12 }}>
+              <View style={{ flex: 1, minWidth: 0, padding: 10, gap: 7, borderWidth: 1, borderColor: lineColor(), borderRadius: 8, backgroundColor: panelColor() }}>
+                <Text style={textStyle(15, textColor(), "700")}>{t("Album cover", "专辑封面")}</Text>
+                <View style={{ flex: 1, alignItems: "center", justifyContent: "center", minHeight: 0 }}>
+                  <Image src={editCoverPreview()} style={{ width: 100, height: 100 }} />
+                </View>
+                <View onPress={() => void chooseEditCover()} style={{ height: 32, alignItems: "center", justifyContent: "center", borderRadius: 4, backgroundColor: raisedColor() }}>
+                  <Text style={textStyle(13, textColor())}>{t("Select cover image", "选择封面图片")}</Text>
+                </View>
+                <Text style={textStyle(11, mutedColor())}>{editCoverPath() ? editCoverName() : t("Existing cover will be kept", "将保留现有封面")}</Text>
+              </View>
+              <View style={{ flex: 1, minWidth: 0, padding: 10, gap: 7, borderWidth: 1, borderColor: lineColor(), borderRadius: 8, backgroundColor: panelColor() }}>
+                <Text style={textStyle(15, textColor(), "700")}>{t("Lyrics", "歌词")}</Text>
+                <Scroll style={{ flex: 1, minHeight: 0, padding: 8, borderRadius: 4, backgroundColor: raisedColor() }}>
+                  <Text numberOfLines={6} style={textStyle(10, textColor())}>{editLyricsPreview() || t("No embedded lyrics", "没有内嵌歌词")}</Text>
+                </Scroll>
+                <View onPress={() => void chooseEditLyrics()} style={{ height: 32, alignItems: "center", justifyContent: "center", borderRadius: 4, backgroundColor: raisedColor() }}>
+                  <Text style={textStyle(13, textColor())}>{t("Select LRC file", "选择 LRC 歌词文件")}</Text>
+                </View>
+                <Text style={textStyle(11, mutedColor())}>{editLyricsPath() ? editLyricsName() : t("Existing lyrics will be kept", "将保留现有歌词")}</Text>
+              </View>
+            </View>
+            {editError() ? <Text style={textStyle(11, palette.danger)}>{editError()}</Text> : null}
+            <View style={{ height: 1, backgroundColor: lineColor() }} />
+            <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8 }}>
+              <View testID="edit-cancel" onPress={() => editingSong.set(null)} style={{ paddingHorizontal: 14, height: 32, justifyContent: "center", borderRadius: 4, backgroundColor: raisedColor() }}>
+                <Text style={textStyle(13, textColor())}>{t("Cancel", "取消")}</Text>
+              </View>
+              <View onPress={() => void saveEdit()} style={{ paddingHorizontal: 16, height: 32, justifyContent: "center", borderRadius: 4, backgroundColor: light() ? "#e4e4e4" : "#3b3b3b", opacity: editSaving() ? 0.65 : 1 }}>
+                <Text style={textStyle(13, textColor(), "500")}>{editSaving() ? t("Saving…", "正在保存…") : t("Save", "保存")}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
+      {deleteTarget() ? (
+        <View style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, zIndex: 21, alignItems: "center", justifyContent: "center", padding: 20, backgroundColor: "#00000088" }}>
+          <View style={{ width: 370, maxWidth: "100%", padding: 20, borderRadius: 8, borderWidth: 1, borderColor: lineColor(), backgroundColor: pageColor(), gap: 11 }}>
+            <Text style={textStyle(17, textColor(), "600")}>{t("Delete this song?", "删除这首歌曲？")}</Text>
+            <Text style={textStyle(13, textColor(), "500")}>{deleteTarget()?.song_name}</Text>
+            <Text style={textStyle(11, secondaryColor())}>{t("The audio file will be removed from your device.", "此音频文件将从设备中删除。")}</Text>
+            <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 5 }}>
+              <View testID="delete-cancel" onPress={() => deleteTarget.set(null)} style={{ paddingHorizontal: 13, paddingVertical: 8, borderRadius: 4, backgroundColor: raisedColor() }}>
+                <Text style={textStyle(12, secondaryColor(), "500")}>{t("Cancel", "取消")}</Text>
+              </View>
+              <View onPress={() => void confirmDelete()} style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 4, backgroundColor: palette.danger }}>
+                <Text style={textStyle(12, "#ffffff", "600")}>{t("Delete song", "删除歌曲")}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+mount(App);

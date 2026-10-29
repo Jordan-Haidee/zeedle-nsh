@@ -1,0 +1,7 @@
+{
+  "name": "Zeedle",
+  "id": "dev.zeedle.music-player",
+  "version": "0.6.5",
+  "build": 1,
+  "rust": "."
+}
