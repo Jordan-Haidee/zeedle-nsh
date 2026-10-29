@@ -60,9 +60,9 @@ On Windows, use the packaging script to include Zeedle's centered startup launch
 powershell -File scripts/package-windows.ps1
 ```
 
-The portable files attached to each GitHub Release are named `Zeedle-v<version>-windows-x86_64.zip`, `Zeedle-v<version>-linux-x86_64.tar.gz` and `Zeedle-v<version>-macos-aarch64.zip`. Linux requires GTK 4.14 and WebKitGTK 6.0; macOS requires version 14 or newer. The macOS archive contains an ad hoc signed `.app` bundle. Windows and Linux packages are directories archived in their platform's standard format.
+The portable files attached to each GitHub Release are named `Zeedle-<tag>-windows-x86_64.zip`, `Zeedle-<tag>-linux-x86_64.tar.gz` and `Zeedle-<tag>-macos-aarch64.zip`; `<tag>` may be `0.1.1` or `v0.1.1`. Linux requires GTK 4.14 and WebKitGTK 6.0; macOS requires version 14 or newer. The macOS archive contains an ad hoc signed `.app` bundle. Windows and Linux packages are directories archived in their platform's standard format.
 
-Push a tag matching the version in `nsh.json` (for example, `v0.1.1`) to build all three archives and publish a GitHub Release. The Actions workflow can also be started manually to validate packaging and screenshots without publishing.
+Push a tag matching the version in `nsh.json` (for example, `0.1.1`) to build all three archives and publish a GitHub Release. The Actions workflow can also be started manually to validate packaging and screenshots without publishing.
 
 For Windows rendering and startup checks:
 
