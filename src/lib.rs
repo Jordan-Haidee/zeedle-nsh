@@ -58,7 +58,7 @@ pub struct PlaybackState {
 }
 
 enum Command {
-    Play(PathBuf),
+    Load(PathBuf, bool),
     Stop,
     Toggle,
     Seek(f32),
@@ -113,7 +113,7 @@ fn backend() -> &'static Backend {
 
                     loop {
                         match rx.recv_timeout(Duration::from_millis(60)) {
-                            Ok(Command::Play(path)) => {
+                            Ok(Command::Load(path, autoplay)) => {
                                 let result = File::open(&path)
                                     .map_err(|error| error.to_string())
                                     .and_then(|file| {
@@ -125,17 +125,20 @@ fn backend() -> &'static Backend {
                                             .total_duration()
                                             .map_or(0.0, |d| d.as_secs_f32());
                                         player.clear();
+                                        player.pause();
                                         player.append(TapSource::new(
                                             source,
                                             fft_tx.clone(),
                                             Arc::clone(&thread_spectrum_enabled),
                                         ));
                                         player.set_volume(thread_state.lock().unwrap().volume);
-                                        player.play();
+                                        if autoplay {
+                                            player.play();
+                                        }
                                         let mut state = thread_state.lock().unwrap();
                                         state.position = 0.0;
                                         state.duration = active_duration;
-                                        state.paused = false;
+                                        state.paused = !autoplay;
                                         state.error.clear();
                                     }
                                     (_, Err(error)) => thread_state.lock().unwrap().error = error,
@@ -580,7 +583,12 @@ impl Music {
 
     /// Start or replace the current track with rodio.
     pub fn play(path: String) {
-        let _ = backend().tx.send(Command::Play(PathBuf::from(path)));
+        let _ = backend().tx.send(Command::Load(PathBuf::from(path), true));
+    }
+
+    /// Load the selected track without starting playback.
+    pub fn load(path: String) {
+        let _ = backend().tx.send(Command::Load(PathBuf::from(path), false));
     }
 
     /// Toggle playback, starting the selected track when possible.

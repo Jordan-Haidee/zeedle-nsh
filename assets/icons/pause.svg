@@ -5,10 +5,9 @@
   viewBox="0 0 24 24"
   fill="none"
   stroke="currentColor"
-  stroke-width="2"
+  stroke-width="2.03"
   stroke-linecap="round"
   stroke-linejoin="round"
 >
-  <rect x="14" y="4" width="4" height="16" rx="1" />
-  <rect x="6" y="4" width="4" height="16" rx="1" />
+  <path d="M15 3h3c.552284 0 1 .4477153 1 1v16c0 .552284-.447715 1-1 1h-3c-.552285 0-1-.447715-1-1V4c0-.552284.447715-1 1-1ZM6 3h3c.552285 0 1 .4477153 1 1v16c0 .552285-.447715 1-1 1H6c-.552284 0-1-.447715-1-1V4c0-.552285.447715-1 1-1Z" />
 </svg>

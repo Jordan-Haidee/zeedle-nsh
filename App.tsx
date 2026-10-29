@@ -1,4 +1,4 @@
-import { Image, List, Scroll, Storage, Text, View, colorScheme, keymap, mount, openUrl, setColorScheme, signal, token } from "nsh";
+import { Image, LayoutAnimation, List, PanResponder, Scroll, Storage, Text, View, colorScheme, keymap, mount, openUrl, setColorScheme, signal, token, type YNode } from "nsh";
 import { Input } from "nsh/base";
 import { Menu, titleBar, Window } from "nsh/desktop";
 import { Music } from "zeedle-nsh/native";
@@ -44,6 +44,8 @@ function App() {
   const spectrumBars = signal<number[]>(Array.from({ length: 48 }, () => 0));
   const playerError = signal("");
   const trackWidth = signal(1);
+  const progressDragging = signal(false);
+  const progressPreview = signal(0);
   const history = signal<string[]>([]);
   const historyIndex = signal(-1);
   const editingSong = signal<SongInfo | null>(null);
@@ -59,6 +61,11 @@ function App() {
   const editError = signal("");
   const editSaving = signal(false);
   const deleteTarget = signal<SongInfo | null>(null);
+  let lyricListRef!: YNode;
+  let lastAutoScrolledLyric = -1;
+  let manualLyricsScrollUntil = 0;
+  let ignoreProgrammaticLyricsScrollUntil = 0;
+  let lastLyricsScrollOffset: number | null = null;
   let handledEnd = false;
 
   const t = (english: string, chinese: string) => language() === "zh" ? chinese : english;
@@ -126,11 +133,13 @@ function App() {
       const active = result.find((song) => song.song_path === current()?.song_path) ?? result[0];
       if (!current() || !result.some((song) => song.song_path === current()?.song_path)) {
         Music.stop();
-        playerLoaded.set(false);
+        playerLoaded.set(true);
         current.set(active);
         position.set(0);
         duration.set(active.duration_secs);
         paused.set(true);
+        lastAutoScrolledLyric = -1;
+        Music.load(active.song_path);
         const [lyricsJson, nextArt] = await Promise.all([Music.lyrics(active.song_path), Music.cover(active.song_path)]);
         if (current()?.song_path === active.song_path) {
           lyrics.set(JSON.parse(lyricsJson) as LyricItem[]);
@@ -146,6 +155,7 @@ function App() {
 
   async function playSong(song: SongInfo, addHistory = true) {
     current.set(song);
+    lastAutoScrolledLyric = -1;
     playerLoaded.set(true);
     position.set(0);
     duration.set(song.duration_secs);
@@ -212,7 +222,44 @@ function App() {
   function seekTo(seconds: number) {
     const next = Math.max(0, Math.min(duration(), seconds));
     position.set(next);
+    progressPreview.set(next);
     Music.seek(next);
+  }
+
+  function noteManualLyricsScroll() {
+    manualLyricsScrollUntil = Date.now() + 5000;
+    lastAutoScrolledLyric = -1;
+  }
+
+  function observeLyricsScroll(offset: number) {
+    const changed = lastLyricsScrollOffset !== null && Math.abs(offset - lastLyricsScrollOffset) > 2;
+    lastLyricsScrollOffset = offset;
+    if (changed && Date.now() >= ignoreProgrammaticLyricsScrollUntil) noteManualLyricsScroll();
+  }
+
+  function autoScrollLyrics(seconds: number) {
+    if (page() !== 2 || paused() || Date.now() < manualLyricsScrollUntil || !lyricListRef) return;
+    const activeIndex = lyricIndexAt(seconds);
+    if (activeIndex < 0 || activeIndex === lastAutoScrolledLyric) return;
+    lastAutoScrolledLyric = activeIndex;
+    ignoreProgrammaticLyricsScrollUntil = Date.now() + 350;
+    lyricListRef.scrollToIndex({ index: Math.max(0, activeIndex - 5), animated: false });
+  }
+
+  function lyricIndexAt(seconds: number) {
+    let activeIndex = -1;
+    for (let index = 0; index < lyrics().length; index++) {
+      if (lyrics()[index].time > seconds) break;
+      activeIndex = index;
+    }
+    return activeIndex;
+  }
+
+  function progressAtX(x: number) {
+    const width = trackWidth();
+    return width > 0 && duration() > 0
+      ? Math.max(0, Math.min(1, x / width)) * duration()
+      : 0;
   }
 
   function seekBy(seconds: number) {
@@ -226,17 +273,26 @@ function App() {
     }
   }
 
+  function navigateToPage(target: Page) {
+    if (target === 2) {
+      lastAutoScrolledLyric = -1;
+      lastLyricsScrollOffset = null;
+      ignoreProgrammaticLyricsScrollUntil = Date.now() + 500;
+    }
+    page.set(target);
+  }
+
   keymap.bind({
     space: togglePlay,
     left: () => seekBy(-15),
     right: () => seekBy(15),
     up: playPrevious,
     down: playNext,
-    f1: () => page.set(0),
-    f2: () => page.set(1),
-    f3: () => page.set(2),
-    f4: () => page.set(3),
-    f5: () => page.set(4),
+    f1: () => navigateToPage(0),
+    f2: () => navigateToPage(1),
+    f3: () => navigateToPage(2),
+    f4: () => navigateToPage(3),
+    f5: () => navigateToPage(4),
   }, { when: "notEditing" });
 
   async function chooseDirectory() {
@@ -349,9 +405,10 @@ function App() {
 
   setInterval(() => {
     const state = JSON.parse(Music.state()) as PlaybackState;
-    position.set(state.position);
+    if (!progressDragging()) position.set(state.position);
     if (state.duration > 0) duration.set(state.duration);
     paused.set(state.paused);
+    autoScrollLyrics(state.position);
     if (state.error) playerError.set(state.error);
     volume.set(state.volume);
     spectrumBars.set(state.spectrum);
@@ -391,13 +448,16 @@ function App() {
     fontFamily: "Microsoft YaHei UI",
   });
 
-  const controlStyle = (size = 36) => ({
+  const controlStyle = (size = 36, radius = 9) => ({
     width: size,
     height: size,
-    borderRadius: 9,
+    borderRadius: radius,
     alignItems: "center" as const,
     justifyContent: "center" as const,
     backgroundColor: "transparent",
+    transitionProperty: "backgroundColor",
+    transitionDuration: 120,
+    transitionTimingFunction: "ease-out" as const,
   });
 
   function SideButton(props: { icon: LucideName; label: string; target: Page }) {
@@ -406,7 +466,7 @@ function App() {
       <View
         testID={`nav-${props.target}`}
         accessibilityLabel={props.label}
-        onPress={() => page.set(props.target)}
+        onPress={() => navigateToPage(props.target)}
         hoverStyle={{ backgroundColor: hoverColor() }}
         activeStyle={{ opacity: 0.72 }}
         style={{
@@ -461,7 +521,10 @@ function App() {
             <View
               testID={`song-row-${item().id}`}
               accessibilityLabel={item().song_name}
-              onPress={() => void playSong(item())}
+              onPress={(event) => {
+                if (event?.clickCount !== 2) return;
+                void playSong(item());
+              }}
               onLongPress={openActions}
               onContextMenu={() => openActions()}
               onHoverIn={() => hovered.set(true)}
@@ -546,6 +609,7 @@ function App() {
   function LyricsPage() {
     const panelHeight = signal(470);
     const albumSize = () => Math.max(120, panelHeight() * 0.4);
+    const initialLyricIndex = () => Math.max(0, lyricIndexAt(position()) - 5);
     return (
       <View testID="screen-2" onLayout={(event) => panelHeight.set(event.size.height)} style={{ flex: 1, minHeight: 0, flexDirection: "row", backgroundColor: pageColor() }}>
         <View style={{ width: lyrics().length ? "30%" : "100%", padding: 20, alignItems: "center", justifyContent: "center" }}>
@@ -558,11 +622,22 @@ function App() {
           </View>
         </View>
         {lyrics().length ? (
-          <List each={lyrics()} keyExtractor={(line) => String(line.time)} estimatedItemSize={40} style={{ width: "70%", flex: 1 }} contentStyle={{ paddingTop: 4, paddingBottom: 12 }}>
-            {(line) => {
+        <List
+          testID="lyrics-list"
+          ref={lyricListRef}
+          each={lyrics()}
+          keyExtractor={(line, index) => `${line.time}:${index}`}
+          estimatedItemSize={40}
+          initialScrollIndex={initialLyricIndex()}
+          onScroll={(event) => observeLyricsScroll(event.offset.y)}
+          onScrollDragStart={noteManualLyricsScroll}
+          style={{ width: "70%", flex: 1 }}
+          contentStyle={{ paddingTop: 4, paddingBottom: 12 }}
+        >
+          {(line, index) => {
               const active = () => position() >= line().time && position() < line().time + line().duration;
               return (
-                <View onPress={() => seekTo(line().time)} style={{ height: 40, alignItems: "center", justifyContent: "center" }}>
+                <View testID={active() ? "lyric-active" : `lyric-${index()}`} onPress={() => seekTo(line().time)} style={{ height: 40, alignItems: "center", justifyContent: "center" }}>
                   <Text numberOfLines={1} style={textStyle(active() ? 20 : 17, active() ? accentColor() : textColor(), active() ? "600" : "400")}>{line().text}</Text>
                 </View>
               );
@@ -693,31 +768,65 @@ function App() {
       <View testID="screen-4" style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: pageColor(), gap: 10 }}>
         <Image src={cover} style={{ width: 120, height: 120 }} />
         <Text style={{ ...textStyle(14, textColor()), textAlign: "center" }}>
-          {"Zeedle\nMusic at the speed of a blink, designed for pure simplicity\nBuilt by "}
-          <Text onPress={() => void openUrl("https://github.com/RustAudio/rodio")} style={{ color: accentColor() }}>Rodio</Text>
-          {" and "}
-          <Text onPress={() => void openUrl("https://slint.dev")} style={{ color: accentColor() }}>Slint UI</Text>
-          {"\nAuthor: Jordan Haidee\nVersion: 0.6.5\n"}
-          <Text onPress={() => void openUrl("https://github.com/Jordan-Haidee/Zeedle")} style={{ color: accentColor() }}>Github</Text>
+          {"Zeedle\nMusic at the speed of a blink, designed for pure simplicity"}
         </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }}>
+          <Text style={textStyle(14, textColor())}>Built by</Text>
+          <View role="link" accessibilityLabel="Rodio" onPress={async () => { await openUrl("https://github.com/RustAudio/rodio"); }}>
+            <Text style={{ ...textStyle(14, accentColor()), textDecorationLine: "underline" }}>Rodio</Text>
+          </View>
+          <Text style={textStyle(14, textColor())}>and</Text>
+          <View testID="about-nsh-link" role="link" accessibilityLabel="NSH" onPress={async () => { await openUrl("https://nsh.dev"); }}>
+            <Text style={{ ...textStyle(14, accentColor()), textDecorationLine: "underline" }}>NSH</Text>
+          </View>
+        </View>
+        <Text style={{ ...textStyle(14, textColor()), textAlign: "center" }}>Author: Jordan Haidee{"\n"}Version: 0.6.5</Text>
+        <View role="link" accessibilityLabel="Github" onPress={async () => { await openUrl("https://github.com/Jordan-Haidee/Zeedle"); }}>
+          <Text style={{ ...textStyle(14, accentColor()), textDecorationLine: "underline" }}>Github</Text>
+        </View>
       </View>
     );
   }
 
   function PlayerPanel() {
-    const progressPercent = () => duration() > 0 ? Math.max(0, Math.min(100, (position() / duration()) * 100)) : 0;
+    const displayedPosition = () => progressDragging() ? progressPreview() : position();
+    const progressPercent = () => duration() > 0 ? Math.max(0, Math.min(100, (displayedPosition() / duration()) * 100)) : 0;
+    let progressStartX = 0;
+    const progressResponder = PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 4,
+      onPanResponderGrant: (event, gesture) => {
+        progressStartX = event.nativeEvent.locationX - gesture.dx;
+        progressDragging.set(true);
+        progressPreview.set(progressAtX(progressStartX));
+      },
+      onPanResponderMove: (_, gesture) => {
+        progressPreview.set(progressAtX(progressStartX + gesture.dx));
+      },
+      onPanResponderRelease: (_, gesture) => {
+        seekTo(progressAtX(progressStartX + gesture.dx));
+        progressDragging.set(false);
+      },
+      onPanResponderTerminate: () => progressDragging.set(false),
+    });
     return (
       <View style={{ height: 72, minHeight: 72, backgroundColor: pageColor() }}>
         <View
+          testID="progress-seek"
+          accessibilityLabel={t("Playback progress", "播放进度")}
+          accessibilityValue={{ min: 0, max: duration(), now: displayedPosition() }}
+          role="adjustable"
+          hitSlop={{ top: 8, bottom: 8 }}
+          onPress={(event) => seekTo(progressAtX(event?.position.x ?? 0))}
           onLayout={(event) => trackWidth.set(event.size.width)}
-          onPress={(event) => seekTo(Math.max(0, Math.min(1, (event?.position.x ?? 0) / trackWidth())) * duration())}
+          {...progressResponder.panHandlers}
           style={{ height: 4, marginHorizontal: 10, backgroundColor: trackColor(), justifyContent: "center" }}
         >
           <View style={{ height: 3, width: `${progressPercent()}%`, backgroundColor: accentColor() }} />
           <View style={{ position: "absolute", left: `${progressPercent()}%`, top: -8, marginLeft: -10, width: 20, height: 20, borderRadius: 10, borderWidth: 3, borderColor: trackThumbBorderColor(), backgroundColor: accentColor() }} />
         </View>
         <View style={{ height: 68, flexDirection: "row", alignItems: "center", paddingHorizontal: 0 }}>
-          <View style={{ width: "35%", flexDirection: "row", alignItems: "center", gap: 3 }} onPress={() => page.set(2)}>
+          <View style={{ width: "35%", flexDirection: "row", alignItems: "center", gap: 3 }} onPress={() => navigateToPage(2)}>
             <View style={{ width: "20%", alignItems: "center", justifyContent: "center" }}>
               <View style={{ width: 40, height: 40, borderRadius: 4, overflow: "hidden" }}>
                 <Image src={art()} style={{ width: 40, height: 40 }} />
@@ -730,12 +839,12 @@ function App() {
             </View>
           </View>
           <View style={{ width: "6%", flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
-            <View accessibilityLabel={t("Repeat current track", "单曲循环")} onPress={() => mode.set(mode() === "order" ? "repeat" : mode() === "repeat" ? "order" : mode())} hoverStyle={{ backgroundColor: hoverColor() }} activeStyle={{ backgroundColor: pressedColor() }} style={controlStyle(20)}>
+            <View accessibilityLabel={t("Repeat current track", "单曲循环")} onPress={() => mode.set(mode() === "order" ? "repeat" : mode() === "repeat" ? "order" : mode())} style={controlStyle(20)}>
               <LucideIcon name={mode() === "repeat" ? "repeat2" : "repeat"} size={18} color={mode() === "order" ? secondaryColor() : accentColor()} />
             </View>
           </View>
           <View style={{ width: "6%", flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
-            <View accessibilityLabel={t("Previous track", "上一首")} onPress={playPrevious} hoverStyle={{ backgroundColor: hoverColor() }} activeStyle={{ backgroundColor: pressedColor() }} style={controlStyle(36)}>
+            <View accessibilityLabel={t("Previous track", "上一首")} onPress={playPrevious} hoverStyle={{ backgroundColor: hoverColor() }} activeStyle={{ backgroundColor: pressedColor() }} style={controlStyle(36, 8)}>
               <LucideIcon name="skipBack" size={26} color={secondaryColor()} />
             </View>
           </View>
@@ -745,17 +854,17 @@ function App() {
             </View>
           </View>
           <View style={{ width: "6%", flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
-            <View accessibilityLabel={t("Next track", "下一首")} onPress={playNext} hoverStyle={{ backgroundColor: hoverColor() }} activeStyle={{ backgroundColor: pressedColor() }} style={controlStyle(36)}>
+            <View accessibilityLabel={t("Next track", "下一首")} onPress={playNext} hoverStyle={{ backgroundColor: hoverColor() }} activeStyle={{ backgroundColor: pressedColor() }} style={controlStyle(36, 8)}>
               <LucideIcon name="skipForward" size={26} color={secondaryColor()} />
             </View>
           </View>
           <View style={{ width: "6%", flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
-            <View accessibilityLabel={t("Shuffle", "随机播放")} onPress={() => mode.set(mode() === "random" ? "order" : "random")} hoverStyle={{ backgroundColor: hoverColor() }} activeStyle={{ backgroundColor: pressedColor() }} style={controlStyle(20)}>
+            <View accessibilityLabel={t("Shuffle", "随机播放")} onPress={() => mode.set(mode() === "random" ? "order" : "random")} style={controlStyle(20)}>
               <LucideIcon name="shuffle" size={18} color={mode() === "random" ? accentColor() : secondaryColor()} />
             </View>
           </View>
           <View style={{ width: "25%", alignItems: "center", justifyContent: "center" }}>
-            <Text style={textStyle(14, textColor())}>{timeLabel(position())} / {timeLabel(duration())}</Text>
+            <Text style={textStyle(14, textColor())}>{timeLabel(displayedPosition())} / {timeLabel(duration())}</Text>
           </View>
           <View style={{ width: "10%", alignItems: "center", justifyContent: "center" }}>
             <View accessibilityLabel={t("Mute", "静音")} onPress={() => { const next = volume() > 0 ? 0 : 0.8; volume.set(next); Music.setVolume(next); void Storage.setItem("zeedle.volume", String(next)); }} hoverStyle={{ backgroundColor: hoverColor() }} activeStyle={{ backgroundColor: pressedColor() }} style={{ width: 28, height: 30, alignItems: "center", justifyContent: "center" }}>
@@ -812,7 +921,15 @@ function App() {
 
       <View style={{ flex: 1, minHeight: 0, flexDirection: "row" }}>
         <View style={{ width: expanded() ? 200 : 54, backgroundColor: panelColor(), borderRightWidth: 1, borderRightColor: lineColor(), paddingTop: 9, paddingBottom: 10 }}>
-          <View testID="sidebar-toggle" onPress={() => expanded.set(!expanded())} hoverStyle={{ backgroundColor: hoverColor() }} style={{ height: 36, marginHorizontal: 6, marginBottom: 10, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", justifyContent: expanded() ? "flex-start" : "center", gap: 12, borderRadius: 8 }}>
+          <View testID="sidebar-toggle" onPress={() => {
+            LayoutAnimation.configureNext({
+              duration: 200,
+              update: { type: "easeOut" },
+              create: { type: "easeOut", property: "opacity", duration: 120 },
+              delete: { type: "easeOut", property: "opacity", duration: 120 },
+            });
+            expanded.set(!expanded());
+          }} hoverStyle={{ backgroundColor: hoverColor() }} style={{ height: 36, marginHorizontal: 6, marginBottom: 10, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", justifyContent: expanded() ? "flex-start" : "center", gap: 12, borderRadius: 8 }}>
             <LucideIcon name={expanded() ? "panelLeftClose" : "panelLeftOpen"} size={18} color={secondaryColor()} />
           </View>
           <View style={{ height: 5 }} />
