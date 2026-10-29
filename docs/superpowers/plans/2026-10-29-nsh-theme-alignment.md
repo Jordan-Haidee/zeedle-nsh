@@ -165,7 +165,7 @@ Expected: all UI tests pass, no TypeScript errors appear, and the Rust crate bui
 - Create temporarily under ignored output: `target/slint-align.test.tsx`
 - Create temporarily under ignored output: `target/slint-align-web.test.tsx`
 - Verify: `target/slint-align-*.png` (ignored screenshots)
-- Compare: `D:/rs-projects/zeedle-slint/assets/p1.png` through `p5.png`
+- Compare: `zeedle-slint/assets/p1.png` through `p5.png`
 
 - [x] **Step 1: Create a temporary screenshot test under `target/`**
 
@@ -179,7 +179,7 @@ test("captures Zeedle pages in both themes", async () => {
     platform: "windows",
     colorScheme: "dark",
     storage: {
-      "zeedle.music-directory": "C:/Users/dell/Music",
+      "zeedle.music-directory": "~/Music",
       "zeedle.light-theme": "false",
       "zeedle.show-spectrum": "true",
     },

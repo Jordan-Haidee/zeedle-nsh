@@ -1,21 +1,68 @@
-# Zeedle
+<p align="center">
+  <img src="assets/cover.svg" alt="Zeedle logo" width="88">
+</p>
 
-A Native Shell music player with a TSX interface and a Rust audio/tag backend. The five screens cover the music gallery, search, lyrics, settings and app information.
+<h1 align="center">Zeedle</h1>
 
-Interface icons are the Lucide SVG set (`0.468.0`, ISC license), kept in `assets/icons/` and tinted by the TSX components.
+<p align="center">
+  <strong>A Native Shell (NSH) port of the <a href="https://github.com/Jordan-Haidee/zeedle">original Zeedle music player</a>.</strong><br>
+  Music at the speed of a blink, designed for pure simplicity.
+</p>
 
-## Run
+<p align="center">
+  Built with <a href="https://nsh.dev">Native Shell</a>, Rust and Rodio
+</p>
+
+---
+
+Zeedle is a lightweight desktop music player focused on your local library. This project brings the original Zeedle experience to [Native Shell](https://nsh.dev), with a TSX interface and a Rust audio and metadata backend.
+
+## Features
+
+- Browse and search local MP3, FLAC, WAV and OGG files.
+- Follow synchronized lyrics and seek by clicking a lyric line.
+- View a live audio spectrum while music plays.
+- Edit song metadata, album art and lyrics from the library.
+- Choose playback order, repeat or shuffle; use keyboard shortcuts for playback and navigation.
+- Switch between English, Chinese, Spanish, French, German and Russian, and follow the system theme.
+
+## Build and run
+
+Install the [NSH CLI](https://nsh.dev/docs/) and a Rust toolchain, then run:
 
 ```sh
 nsh run
-nsh check
+```
+
+To check the app and run its tests:
+
+```sh
+nsh check -v
+nsh test App.test.tsx
+```
+
+Playback integration tests use songs from the default Music folder, including **一眼万年**, **万疆**, **Deadman** and **Love Story**. Keep those tracks and their lyric metadata available when running the full suite; no copyrighted audio is included in this repository.
+
+## Package for Windows
+
+```powershell
 powershell -File scripts/package-windows.ps1
 ```
 
-The gallery scans the user's `Music` folder on first launch. Choose another directory from **Settings**. Supported files are MP3, FLAC, WAV and OGG.
+The script builds the NSH bundle and Zeedle's Windows launcher. The launcher waits until the music library and first UI are ready, then opens centered with the Zeedle icon. Distribute the complete `.nsh/out/Zeedle` folder or `.nsh/out/Zeedle.zip`.
 
-The Windows packaging script runs `nsh package --target windows`, then builds the project's Windows launcher. This launcher keeps the window hidden until the initial library and UI are ready, centers it, and presents the prepared first frame. Use this script for release packages; the default NSH launcher displays its window immediately. Distribute the complete `.nsh/out/Zeedle` directory, including its `nsh` subdirectory, or `Zeedle.zip`.
+For Windows rendering and startup checks:
 
-Check native Windows rendering with `nsh test tests/windows-visual.test.tsx --target windows`. After packaging, `powershell -File scripts/check-windows-startup.ps1` launches its own instance, checks hidden startup and screen centering, saves a `PrintWindow` screenshot without raising the window, and closes that instance.
+```sh
+nsh test tests/windows-visual.test.tsx --target windows
+powershell -File scripts/check-windows-startup.ps1
+```
 
-Rust uses rodio for playback and Lofty for embedded tags, lyrics, album art and title/artist/album edits. The spectrum view is calculated with rustfft. TSX files live in `App.tsx`; the app's native module is in `src/lib.rs`.
+## Project structure
+
+- `App.tsx` — screens, navigation and player controls.
+- `src/lib.rs` and `src/spectrum.rs` — audio playback, metadata, browser links and spectrum analysis.
+- `assets/icons/` — Lucide SVG interface icons.
+- `theme.json` — light and dark theme tokens.
+
+The original Zeedle project is maintained at [Jordan-Haidee/zeedle](https://github.com/Jordan-Haidee/zeedle). This repository is its NSH port; it is not the original Slint application.

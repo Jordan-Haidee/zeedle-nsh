@@ -1,9 +1,13 @@
 import { expect, open, test } from "nsh/test";
 import { Music } from "zeedle-nsh/native";
 
+const musicDirectory = Music.defaultDirectory();
+
 test("one pause click stays paused across playback state polls", async () => {
-  const app = await open("./App.tsx", { width: 900, height: 510, platform: "windows", storage: { "zeedle.music-directory": "D:/rs-projects/zeedle-slint/audios" } });
-  await app.waitFor("text:一眼万年 - S.H.E");
+  const songs = JSON.parse(await Music.scan(musicDirectory)) as { song_name: string; singer: string }[];
+  if (!songs.length) throw new Error("The default Music folder must contain a song for this playback test");
+  const app = await open("./App.tsx", { width: 900, height: 510, platform: "windows", storage: { "zeedle.music-directory": musicDirectory } });
+  await app.waitFor(`text:${songs[0].song_name} - ${songs[0].singer}`);
   await app.press("id:control-play-pause");
   await app.waitFor("label:Pause");
   await app.press("id:control-play-pause");
@@ -59,7 +63,7 @@ test("metadata actions open editable and confirmation dialogs", async () => {
     width: 900,
     height: 510,
     platform: "windows",
-    storage: { "zeedle.music-directory": "D:/rs-projects/zeedle-slint/audios" },
+    storage: { "zeedle.music-directory": musicDirectory },
   });
   await app.waitFor("text:一眼万年");
   await app.wait(300);
@@ -79,23 +83,25 @@ test("metadata actions open editable and confirmation dialogs", async () => {
 });
 
 test("song rows start playback only on double click", async () => {
+  const songs = JSON.parse(await Music.scan(musicDirectory)) as { song_name: string; singer: string }[];
+  if (!songs.length) throw new Error("The default Music folder must contain a song for this playback test");
   const app = await open("./App.tsx", {
     width: 900,
     height: 510,
     platform: "windows",
     colorScheme: "dark",
     storage: {
-      "zeedle.music-directory": "D:/rs-projects/zeedle-slint/audios",
+      "zeedle.music-directory": musicDirectory,
       "zeedle.light-theme": "false",
       "zeedle.show-spectrum": "false",
     },
   });
 
   await app.waitFor("text:万疆");
-  await app.waitFor("text:一眼万年 - S.H.E");
+  await app.waitFor(`text:${songs[0].song_name} - ${songs[0].singer}`);
   await app.press("text:万疆");
   await app.wait(100);
-  expect(app.texts()).toContain("一眼万年 - S.H.E");
+  expect(app.texts()).toContain(`${songs[0].song_name} - ${songs[0].singer}`);
   expect(app.shows("text:万疆 - 李玉刚")).toBe(false);
   await app.press("text:万疆");
   await app.wait(100);
@@ -109,7 +115,7 @@ test("pressing a lyric seeks the playing song", async () => {
     platform: "windows",
     colorScheme: "dark",
     storage: {
-      "zeedle.music-directory": "C:/Users/dell/Music",
+      "zeedle.music-directory": musicDirectory,
       "zeedle.light-theme": "false",
       "zeedle.show-spectrum": "false",
     },
@@ -133,7 +139,7 @@ test("pressing a lyric seeks the playing song", async () => {
 });
 
 test("lyric seek is retained before playback starts", async () => {
-  const directory = "C:/Users/dell/Music";
+  const directory = musicDirectory;
   const songs = JSON.parse(await Music.scan(directory)) as { song_name: string; singer: string; song_path: string }[];
   const song = songs.find((item) => item.song_name === "Deadman");
   if (!song) throw new Error("Deadman seek fixture was not found");
@@ -163,7 +169,7 @@ test("lyric seek is retained before playback starts", async () => {
 });
 
 test("playback keeps the active lyric in the visible list", async () => {
-  const directory = "C:/Users/dell/Music";
+  const directory = musicDirectory;
   const songs = JSON.parse(await Music.scan(directory)) as { song_name: string; song_path: string }[];
   const song = songs.find((item) => item.song_name === "Love Story");
   if (!song) throw new Error("Love Story fixture was not found");
@@ -214,15 +220,16 @@ test("clicking the progress bar seeks the playing song", async () => {
     platform: "windows",
     colorScheme: "dark",
     storage: {
-      "zeedle.music-directory": "D:/rs-projects/zeedle-slint/audios",
+      "zeedle.music-directory": musicDirectory,
       "zeedle.light-theme": "false",
       "zeedle.show-spectrum": "false",
     },
   });
 
+  await app.waitFor("text:一眼万年");
+  await app.press("text:一眼万年");
+  await app.press("text:一眼万年");
   await app.waitFor("text:一眼万年 - S.H.E");
-  await app.press("text:一眼万年");
-  await app.press("text:一眼万年");
   await app.wait(200);
   const started = JSON.parse(Music.state()) as { position: number; duration: number };
   await app.press("id:progress-seek");
@@ -238,15 +245,16 @@ test("dragging the progress bar does not seek", async () => {
     platform: "windows",
     colorScheme: "dark",
     storage: {
-      "zeedle.music-directory": "D:/rs-projects/zeedle-slint/audios",
+      "zeedle.music-directory": musicDirectory,
       "zeedle.light-theme": "false",
       "zeedle.show-spectrum": "false",
     },
   });
 
+  await app.waitFor("text:一眼万年");
+  await app.press("text:一眼万年");
+  await app.press("text:一眼万年");
   await app.waitFor("text:一眼万年 - S.H.E");
-  await app.press("text:一眼万年");
-  await app.press("text:一眼万年");
   await app.wait(150);
   const before = (JSON.parse(Music.state()) as { position: number }).position;
   await app.drag("id:progress-seek", { x: 150, y: 0 });

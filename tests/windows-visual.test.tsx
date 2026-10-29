@@ -1,10 +1,12 @@
 import { expect, open, test } from "nsh/test";
+import { Music } from "zeedle-nsh/native";
 
 test("Windows transport controls stay centered and pause remains stable", async () => {
-  const app = await open("../App.tsx", { width: 900, height: 510, platform: "windows", colorScheme: "dark", storage: { "zeedle.music-directory": "D:/rs-projects/zeedle-slint/audios", "zeedle.light-theme": "false", "zeedle.show-spectrum": "false" } });
+  const app = await open("../App.tsx", { width: 900, height: 510, platform: "windows", colorScheme: "dark", storage: { "zeedle.music-directory": Music.defaultDirectory(), "zeedle.light-theme": "false", "zeedle.show-spectrum": "false" } });
   await app.keyboard.press("f1");
   await app.waitFor("id:control-play-pause");
-  await app.waitFor("text:一眼万年 - S.H.E");
+  const songs = JSON.parse(await Music.scan(Music.defaultDirectory())) as { song_name: string; singer: string }[];
+  if (songs.length) await app.waitFor(`text:${songs[0].song_name} - ${songs[0].singer}`);
   for (const id of ["control-play-pause", "control-previous", "control-next"]) {
     await app.hover(`id:${id}`);
     await app.wait(180);
