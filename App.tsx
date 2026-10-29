@@ -980,9 +980,9 @@ function App() {
       </View>
 
       {playerError() ? (
-        <View onPress={() => playerError.set("")} style={{ position: "absolute", right: 15, bottom: page() === 0 ? 82 : 12, maxWidth: 360, paddingHorizontal: 12, paddingVertical: 9, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: dangerSurfaceColor(), borderRadius: 7, borderWidth: 1, borderColor: dangerColor() }}>
+        <View onPress={() => playerError.set("")} style={{ position: "absolute", right: 15, bottom: page() === 0 ? 82 : 12, width: "80%", maxWidth: 334, paddingHorizontal: 12, paddingVertical: 9, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: dangerSurfaceColor(), borderRadius: 7, borderWidth: 1, borderColor: dangerColor() }}>
           <LucideIcon name="circleAlert" size={16} color={dangerColor()} />
-          <Text numberOfLines={2} style={textStyle(11, dangerTextColor())}>{playerError()}</Text>
+          <Text numberOfLines={2} style={{ ...textStyle(11, dangerTextColor()), flex: 1, minWidth: 0 }}>{playerError()}</Text>
         </View>
       ) : null}
 
