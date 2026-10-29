@@ -203,7 +203,9 @@ function App() {
     void playSong(list[(index - 1 + list.length) % list.length]);
   }
 
-  function togglePlay() {
+  const pausePending = signal(false);
+  async function togglePlay() {
+    if (pausePending()) return;
     if (!current()) {
       const first = displayedSongs()[0];
       if (first) void playSong(first);
@@ -213,8 +215,18 @@ function App() {
       void playSong(current()!, false);
       return;
     }
-    Music.toggle();
-    paused.set(!paused());
+    const target = !paused();
+    pausePending.set(true);
+    try {
+      paused.set(await Music.setPaused(target));
+    } finally {
+      pausePending.set(false);
+    }
+  }
+
+  function changeMode(next: "order" | "repeat" | "random") {
+    mode.set(next);
+    void Storage.setItem("zeedle.play-mode", next);
   }
 
   function seekTo(seconds: number) {
@@ -398,13 +410,15 @@ function App() {
     if (savedLanguage === "zh" || savedLanguage === "es" || savedLanguage === "fr" || savedLanguage === "de" || savedLanguage === "ru") language.set(savedLanguage);
     Music.setSpectrumEnabled(showSpectrum());
     await refreshSongs(savedDirectory || directory());
-  })();
+  })().catch((error) => playerError.set(String(error))).finally(() => {
+    setTimeout(() => Music.finishStartup?.(), 32);
+  });
 
   setInterval(() => {
     const state = JSON.parse(Music.state()) as PlaybackState;
     position.set(state.position);
     if (state.duration > 0) duration.set(state.duration);
-    paused.set(state.paused);
+    if (!pausePending()) paused.set(state.paused);
     autoScrollLyrics(state.position);
     if (state.error) playerError.set(state.error);
     volume.set(state.volume);
@@ -458,10 +472,10 @@ function App() {
     transitionTimingFunction: "ease-out" as const,
   });
 
-  function PlayerTransportIcon(props: { name: LucideName; color: string }) {
+  function PlayerTransportIcon(props: { name: LucideName; color: string; visible?: boolean }) {
     return (
-      <View pointerEvents="none" style={{ position: "absolute", left: 5, top: 5, width: 26, height: 26, alignItems: "center", justifyContent: "center" }}>
-        <LucideIcon name={props.name} size={26} color={props.color} />
+      <View pointerEvents="none" style={{ position: "absolute", left: 5, top: 5, width: 26, height: 26, opacity: props.visible === false ? 0 : 1, alignItems: "center", justifyContent: "center" }}>
+        <Image src={Music.transportIcon(props.name, props.color)} resizeMode="contain" style={{ width: 26, height: 26 }} />
       </View>
     );
   }
@@ -478,7 +492,10 @@ function App() {
         activeStyle={{ backgroundColor: pressedColor() }}
         style={{ ...controlStyle(36, props.radius ?? 9), backgroundColor: hovered() ? hoverColor() : "transparent" }}
       >
-        <PlayerTransportIcon name={props.name} color={props.color} />
+        {props.name === "play" || props.name === "pause" ? <>
+          <PlayerTransportIcon name="play" color={props.color} visible={props.name === "play"} />
+          <PlayerTransportIcon name="pause" color={props.color} visible={props.name === "pause"} />
+        </> : <PlayerTransportIcon name={props.name} color={props.color} />}
       </View>
     );
   }
@@ -842,8 +859,8 @@ function App() {
             </View>
           </View>
           <View style={{ width: "6%", flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
-            <View accessibilityLabel={t("Repeat current track", "单曲循环")} onPress={() => mode.set(mode() === "order" ? "repeat" : mode() === "repeat" ? "order" : mode())} style={controlStyle(20)}>
-              <LucideIcon name={mode() === "repeat" ? "repeat2" : "repeat"} size={18} color={mode() === "order" ? secondaryColor() : accentColor()} />
+            <View testID="control-repeat" accessibilityLabel={t("Repeat current track", "单曲循环")} accessibilityState={{ selected: mode() === "repeat" }} onPress={() => changeMode(mode() === "repeat" ? "order" : "repeat")} style={controlStyle(20)}>
+              <LucideIcon name={mode() === "repeat" ? "repeat2" : "repeat"} size={18} color={mode() === "repeat" ? accentColor() : secondaryColor()} />
             </View>
           </View>
           <View style={{ width: "6%", flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
@@ -856,7 +873,7 @@ function App() {
             <PlayerTransportButton testID="control-next" label={t("Next track", "下一首")} name="skipForward" color={secondaryColor()} onPress={playNext} radius={8} />
           </View>
           <View style={{ width: "6%", flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
-            <View accessibilityLabel={t("Shuffle", "随机播放")} onPress={() => mode.set(mode() === "random" ? "order" : "random")} style={controlStyle(20)}>
+            <View testID="control-shuffle" accessibilityLabel={t("Shuffle", "随机播放")} accessibilityState={{ selected: mode() === "random" }} onPress={() => changeMode(mode() === "random" ? "order" : "random")} style={controlStyle(20)}>
               <LucideIcon name="shuffle" size={18} color={mode() === "random" ? accentColor() : secondaryColor()} />
             </View>
           </View>

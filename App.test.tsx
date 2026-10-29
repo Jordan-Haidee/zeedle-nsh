@@ -1,6 +1,29 @@
 import { expect, open, test } from "nsh/test";
 import { Music } from "zeedle-nsh/native";
 
+test("one pause click stays paused across playback state polls", async () => {
+  const app = await open("./App.tsx", { width: 900, height: 510, platform: "windows", storage: { "zeedle.music-directory": "D:/rs-projects/zeedle-slint/audios" } });
+  await app.waitFor("text:一眼万年 - S.H.E");
+  await app.press("id:control-play-pause");
+  await app.waitFor("label:Pause");
+  await app.press("id:control-play-pause");
+  await app.waitUntil(() => JSON.parse(Music.state()).paused === true);
+  for (let poll = 0; poll < 6; poll++) {
+    await app.wait(120);
+    expect(app.shows("label:Play")).toBe(true);
+    expect(JSON.parse(Music.state()).paused).toBe(true);
+  }
+});
+
+test("repeat and shuffle replace each other and toggle back to order", async () => {
+  const app = await open("./App.tsx", { width: 900, height: 510, platform: "windows" });
+  await app.wait(100);
+  for (const [button, expected] of [["control-shuffle", "random"], ["control-repeat", "repeat"], ["control-shuffle", "random"], ["control-shuffle", "order"], ["control-repeat", "repeat"], ["control-repeat", "order"]]) {
+    await app.press(`id:${button}`);
+    await app.waitUntil(() => app.storage()["zeedle.play-mode"] === expected);
+  }
+});
+
 test("navigates between the five Zeedle pages", async () => {
   const app = await open("./App.tsx", {
     width: 900,

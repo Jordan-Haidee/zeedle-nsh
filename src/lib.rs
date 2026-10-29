@@ -23,11 +23,19 @@ use rodio::{Decoder, DeviceSinkBuilder, Player, Source};
 use serde::{Deserialize, Serialize};
 
 mod spectrum;
+#[cfg(windows)]
+mod startup;
 use spectrum::{SpectrumChunk, TapSource, default_spectrum, try_start_spectrum_worker};
 
 #[native_module("zeedle-nsh/native")]
 fn native(registry: &mut Registry) {
     registry.module::<Music>();
+}
+
+/// Connect the packaged launcher's initially hidden native window.
+#[cfg(windows)]
+pub fn set_startup_window(handle: isize) {
+    startup::set_window(handle);
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -61,6 +69,7 @@ enum Command {
     Load(PathBuf, bool),
     Stop,
     Toggle,
+    SetPaused(bool, mpsc::SyncSender<bool>),
     Seek(f32),
     Volume(f32),
 }
@@ -144,6 +153,20 @@ fn backend() -> &'static Backend {
                                     (_, Err(error)) => thread_state.lock().unwrap().error = error,
                                     (None, Ok(_)) => {}
                                 }
+                            }
+                            Ok(Command::SetPaused(paused, reply)) => {
+                                let actual = if let Some(player) = player.as_ref() {
+                                    if paused {
+                                        player.pause();
+                                    } else if !player.empty() {
+                                        player.play();
+                                    }
+                                    player.is_paused()
+                                } else {
+                                    true
+                                };
+                                thread_state.lock().unwrap().paused = actual;
+                                let _ = reply.send(actual);
                             }
                             Ok(Command::Toggle) => {
                                 if let Some(player) = player.as_ref() {
@@ -411,6 +434,37 @@ pub struct Music;
 
 #[module]
 impl Music {
+    /// Set an explicit playback state and acknowledge it after the audio worker applies it.
+    pub async fn set_paused(paused: bool) -> bool {
+        let (reply, received) = mpsc::sync_channel(1);
+        if backend()
+            .tx
+            .send(Command::SetPaused(paused, reply))
+            .is_err()
+        {
+            return true;
+        }
+        received.recv().unwrap_or(true)
+    }
+    /// Color the original Lucide SVG before decoding, avoiding native bitmap tint transforms.
+    pub fn transport_icon(name: String, color: String) -> String {
+        let svg = match name.as_str() {
+            "play" => include_str!("../assets/icons/play.svg"),
+            "pause" => include_str!("../assets/icons/pause.svg"),
+            "skipBack" => include_str!("../assets/icons/skip-back.svg"),
+            "skipForward" => include_str!("../assets/icons/skip-forward.svg"),
+            _ => return String::new(),
+        };
+        format!(
+            "data:image/svg+xml;base64,{}",
+            STANDARD.encode(svg.replace("currentColor", &color))
+        )
+    }
+    /// Reveal the centered packaged window once the initial library has loaded.
+    pub fn finish_startup() {
+        #[cfg(windows)]
+        startup::ready();
+    }
     /// Scan one directory for supported music files and read their Lofty tags.
     pub async fn scan(directory: String) -> String {
         serde_json::to_string(&scan(Path::new(&directory))).unwrap_or_else(|_| "[]".into())
