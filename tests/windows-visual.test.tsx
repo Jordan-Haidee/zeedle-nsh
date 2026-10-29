@@ -2,6 +2,8 @@ import { expect, open, test } from "nsh/test";
 
 test("Windows transport controls stay centered and pause remains stable", async () => {
   const app = await open("../App.tsx", { width: 900, height: 510, platform: "windows", colorScheme: "dark", storage: { "zeedle.music-directory": "D:/rs-projects/zeedle-slint/audios", "zeedle.light-theme": "false", "zeedle.show-spectrum": "false" } });
+  await app.keyboard.press("f1");
+  await app.waitFor("id:control-play-pause");
   await app.waitFor("text:一眼万年 - S.H.E");
   for (const id of ["control-play-pause", "control-previous", "control-next"]) {
     await app.hover(`id:${id}`);
@@ -23,7 +25,12 @@ test("Windows transport controls stay centered and pause remains stable", async 
   await app.screenshot("target/windows-mode-random.png");
   await app.press("id:control-repeat");
   await app.screenshot("target/windows-mode-order.png");
+  await app.press("id:nav-4");
+  await app.waitFor("id:about-nsh-link");
+  expect(app.shows("id:about-nsh-link")).toBe(true);
   await app.press("id:theme-toggle");
+  await app.press("id:nav-0");
+  await app.waitFor("id:control-play-pause");
   for (const id of ["control-play-pause", "control-previous", "control-next"]) {
     await app.hover(`id:${id}`);
     await app.wait(180);

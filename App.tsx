@@ -1,4 +1,4 @@
-import { Image, LayoutAnimation, List, Scroll, Storage, Text, View, colorScheme, keymap, mount, openUrl, setColorScheme, signal, token, type YNode } from "nsh";
+import { Image, LayoutAnimation, List, Scroll, Storage, Text, View, colorScheme, keymap, mount, setColorScheme, signal, token, type YNode } from "nsh";
 import { Input } from "nsh/base";
 import { Menu, titleBar, Window } from "nsh/desktop";
 import { Music } from "zeedle-nsh/native";
@@ -67,6 +67,10 @@ function App() {
   let handledEnd = false;
 
   const t = (english: string, chinese: string) => language() === "zh" ? chinese : english;
+  async function openExternalUrl(url: string) {
+    const error = await Music.openUrl(url);
+    if (error) playerError.set(error);
+  }
 
   Window.setTitle("Zeedle");
   Window.setTitleBar("hidden", 40);
@@ -812,16 +816,16 @@ function App() {
         </Text>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }}>
           <Text style={textStyle(14, textColor())}>Built by</Text>
-          <View role="link" accessibilityLabel="Rodio" onPress={async () => { await openUrl("https://github.com/RustAudio/rodio"); }}>
+          <View role="link" accessibilityLabel="Rodio" onPress={() => void openExternalUrl("https://github.com/RustAudio/rodio")}>
             <Text style={{ ...textStyle(14, accentColor()), textDecorationLine: "underline" }}>Rodio</Text>
           </View>
           <Text style={textStyle(14, textColor())}>and</Text>
-          <View testID="about-nsh-link" role="link" accessibilityLabel="NSH" onPress={async () => { await openUrl("https://nsh.dev"); }}>
+          <View testID="about-nsh-link" role="link" accessibilityLabel="NSH" onPress={() => void openExternalUrl("https://nsh.dev")}>
             <Text style={{ ...textStyle(14, accentColor()), textDecorationLine: "underline" }}>NSH</Text>
           </View>
         </View>
         <Text style={{ ...textStyle(14, textColor()), textAlign: "center" }}>Author: Jordan Haidee{"\n"}Version: 0.6.5</Text>
-        <View role="link" accessibilityLabel="Github" onPress={async () => { await openUrl("https://github.com/Jordan-Haidee/Zeedle"); }}>
+        <View role="link" accessibilityLabel="Github" onPress={() => void openExternalUrl("https://github.com/Jordan-Haidee/Zeedle")}>
           <Text style={{ ...textStyle(14, accentColor()), textDecorationLine: "underline" }}>Github</Text>
         </View>
       </View>

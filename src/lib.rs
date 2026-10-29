@@ -434,6 +434,19 @@ pub struct Music;
 
 #[module]
 impl Music {
+    /// Whether a URL may be handed to the system browser.
+    pub fn is_browser_url(url: String) -> bool {
+        url.starts_with("https://") || url.starts_with("http://")
+    }
+
+    /// Open an external HTTP URL with the user's default browser.
+    pub fn open_url(url: String) -> String {
+        if !Self::is_browser_url(url.clone()) {
+            return "Only HTTP and HTTPS links can be opened".into();
+        }
+        open::that(url).map_or_else(|error| error.to_string(), |_| String::new())
+    }
+
     /// Set an explicit playback state and acknowledge it after the audio worker applies it.
     pub async fn set_paused(paused: bool) -> bool {
         let (reply, received) = mpsc::sync_channel(1);

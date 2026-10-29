@@ -3,6 +3,7 @@ Push-Location (Split-Path $PSScriptRoot -Parent)
 try {
   rtk nsh package --target windows
   if ($LASTEXITCODE -ne 0) { throw 'NSH packaging failed' }
+  Copy-Item -LiteralPath assets/cover.ico -Destination .nsh/out/Zeedle/nsh/assets/assets/cover.ico -Force
   Copy-Item -LiteralPath scripts/windows-main.rs -Destination .nsh/rust/windows-app/main.rs -Force
   # Copy-Item preserves mtime; force Cargo to notice the launcher replacement.
   (Get-Item -LiteralPath .nsh/rust/windows-app/main.rs).LastWriteTimeUtc = [DateTime]::UtcNow

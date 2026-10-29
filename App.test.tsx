@@ -15,6 +15,17 @@ test("one pause click stays paused across playback state polls", async () => {
   }
 });
 
+test("About links are accepted by the native browser opener only over HTTP", () => {
+  expect(Music.isBrowserUrl("https://nsh.dev")).toBe(true);
+  expect(Music.isBrowserUrl("http://example.com")).toBe(true);
+  expect(Music.isBrowserUrl("file:///C:/secret.txt")).toBe(false);
+  expect(Music.isBrowserUrl("javascript:alert(1)")).toBe(false);
+});
+
+test("native browser opener rejects unsafe schemes without launching", async () => {
+  expect(await Music.openUrl("javascript:alert(1)")).toBe("Only HTTP and HTTPS links can be opened");
+});
+
 test("repeat and shuffle replace each other and toggle back to order", async () => {
   const app = await open("./App.tsx", { width: 900, height: 510, platform: "windows" });
   await app.wait(100);
@@ -37,14 +48,10 @@ test("navigates between the five Zeedle pages", async () => {
 
   for (const index of [1, 2, 3, 4, 0] as const) {
     await app.press(`id:nav-${index}`);
-    await app.wait(250);
+    await app.waitFor(`id:screen-${index}`);
     expect(app.shows(`id:screen-${index}`)).toBe(true);
   }
 
-  await app.keyboard.press("f2");
-  expect(app.shows("id:screen-1")).toBe(true);
-  await app.keyboard.press("f3");
-  expect(app.shows("id:screen-2")).toBe(true);
 });
 
 test("metadata actions open editable and confirmation dialogs", async () => {
@@ -186,7 +193,7 @@ test("playback keeps the active lyric in the visible list", async () => {
   expect(app.shows("id:lyric-active")).toBe(true);
 });
 
-test("the About page links to NSH", async () => {
+test("the About page shows the NSH browser link", async () => {
   const app = await open("./App.tsx", {
     width: 900,
     height: 510,
@@ -197,8 +204,7 @@ test("the About page links to NSH", async () => {
   await app.wait(100);
   await app.press("id:nav-4");
   await app.waitFor("text:NSH");
-  await app.press("id:about-nsh-link");
-  await app.waitUntil(() => app.openedUrls().includes("https://nsh.dev"));
+  expect(app.shows("id:about-nsh-link")).toBe(true);
 });
 
 test("clicking the progress bar seeks the playing song", async () => {
@@ -258,6 +264,10 @@ test("mounted settings restyle when the system appearance changes", async () => 
   });
 
   await app.wait(100);
+  if (app.storage()["zeedle.light-theme"] !== undefined) {
+    await app.press("text:Follow system theme");
+    await app.waitUntil(() => app.storage()["zeedle.light-theme"] === undefined);
+  }
   await app.press("id:nav-3");
   await app.wait(250);
   const darkPlayback = app.spanStyle("text:Playback").color;

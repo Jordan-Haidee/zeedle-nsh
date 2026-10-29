@@ -11,9 +11,13 @@ use nsh_platform_windows::windows::Win32::{
     UI::HiDpi::{
         DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, GetDpiForWindow, SetProcessDpiAwarenessContext,
     },
-    UI::WindowsAndMessaging::*,
+    UI::WindowsAndMessaging::{
+        ICON_BIG, ICON_SMALL, IMAGE_ICON, LR_LOADFROMFILE, LoadImageW, SendMessageW, WM_SETICON, *,
+    },
 };
+use nsh_platform_windows::windows::core::PCWSTR;
 use nsh_platform_windows::{AppOptions, AppView, AssetBase, Bundle, Limits};
+use std::os::windows::ffi::OsStrExt;
 use std::sync::atomic::{AtomicIsize, Ordering};
 
 static ORIGINAL: AtomicIsize = AtomicIsize::new(0);
@@ -71,6 +75,29 @@ fn run_window() -> Result<(), String> {
     // AppView::new is hidden; this host deliberately does not call view.show().
     unsafe {
         app_nsh_app_zeedle_nsh::set_startup_window(hwnd.0 as isize);
+        let icon_path = dir.join("assets/assets/cover.ico");
+        let icon_path: Vec<u16> = icon_path.as_os_str().encode_wide().chain(Some(0)).collect();
+        if let Ok(icon) = LoadImageW(
+            None,
+            PCWSTR(icon_path.as_ptr()),
+            IMAGE_ICON,
+            256,
+            256,
+            LR_LOADFROMFILE,
+        ) {
+            let _ = SendMessageW(
+                hwnd,
+                WM_SETICON,
+                Some(WPARAM(ICON_BIG as usize)),
+                Some(LPARAM(icon.0 as isize)),
+            );
+            let _ = SendMessageW(
+                hwnd,
+                WM_SETICON,
+                Some(WPARAM(ICON_SMALL as usize)),
+                Some(LPARAM(icon.0 as isize)),
+            );
+        }
         ORIGINAL.store(
             SetWindowLongPtrW(hwnd, GWLP_WNDPROC, startup_proc as *const () as isize),
             Ordering::Release,
