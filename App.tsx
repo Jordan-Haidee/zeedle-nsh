@@ -1,4 +1,4 @@
-import { Image, LayoutAnimation, List, PanResponder, Scroll, Storage, Text, View, colorScheme, keymap, mount, openUrl, setColorScheme, signal, token, type YNode } from "nsh";
+import { Image, LayoutAnimation, List, Scroll, Storage, Text, View, colorScheme, keymap, mount, openUrl, setColorScheme, signal, token, type YNode } from "nsh";
 import { Input } from "nsh/base";
 import { Menu, titleBar, Window } from "nsh/desktop";
 import { Music } from "zeedle-nsh/native";
@@ -44,8 +44,6 @@ function App() {
   const spectrumBars = signal<number[]>(Array.from({ length: 48 }, () => 0));
   const playerError = signal("");
   const trackWidth = signal(1);
-  const progressDragging = signal(false);
-  const progressPreview = signal(0);
   const history = signal<string[]>([]);
   const historyIndex = signal(-1);
   const editingSong = signal<SongInfo | null>(null);
@@ -222,7 +220,6 @@ function App() {
   function seekTo(seconds: number) {
     const next = Math.max(0, Math.min(duration(), seconds));
     position.set(next);
-    progressPreview.set(next);
     Music.seek(next);
   }
 
@@ -405,7 +402,7 @@ function App() {
 
   setInterval(() => {
     const state = JSON.parse(Music.state()) as PlaybackState;
-    if (!progressDragging()) position.set(state.position);
+    position.set(state.position);
     if (state.duration > 0) duration.set(state.duration);
     paused.set(state.paused);
     autoScrollLyrics(state.position);
@@ -449,6 +446,7 @@ function App() {
   });
 
   const controlStyle = (size = 36, radius = 9) => ({
+    position: "relative" as const,
     width: size,
     height: size,
     borderRadius: radius,
@@ -459,6 +457,31 @@ function App() {
     transitionDuration: 120,
     transitionTimingFunction: "ease-out" as const,
   });
+
+  function PlayerTransportIcon(props: { name: LucideName; color: string }) {
+    return (
+      <View pointerEvents="none" style={{ position: "absolute", left: 5, top: 5, width: 26, height: 26, alignItems: "center", justifyContent: "center" }}>
+        <LucideIcon name={props.name} size={26} color={props.color} />
+      </View>
+    );
+  }
+
+  function PlayerTransportButton(props: { testID: string; label: string; name: LucideName; color: string; onPress: () => void; radius?: number }) {
+    const hovered = signal(false);
+    return (
+      <View
+        testID={props.testID}
+        accessibilityLabel={props.label}
+        onPress={props.onPress}
+        onHoverIn={() => hovered.set(true)}
+        onHoverOut={() => hovered.set(false)}
+        activeStyle={{ backgroundColor: pressedColor() }}
+        style={{ ...controlStyle(36, props.radius ?? 9), backgroundColor: hovered() ? hoverColor() : "transparent" }}
+      >
+        <PlayerTransportIcon name={props.name} color={props.color} />
+      </View>
+    );
+  }
 
   function SideButton(props: { icon: LucideName; label: string; target: Page }) {
     const selected = () => page() === props.target;
@@ -789,37 +812,17 @@ function App() {
   }
 
   function PlayerPanel() {
-    const displayedPosition = () => progressDragging() ? progressPreview() : position();
-    const progressPercent = () => duration() > 0 ? Math.max(0, Math.min(100, (displayedPosition() / duration()) * 100)) : 0;
-    let progressStartX = 0;
-    const progressResponder = PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 4,
-      onPanResponderGrant: (event, gesture) => {
-        progressStartX = event.nativeEvent.locationX - gesture.dx;
-        progressDragging.set(true);
-        progressPreview.set(progressAtX(progressStartX));
-      },
-      onPanResponderMove: (_, gesture) => {
-        progressPreview.set(progressAtX(progressStartX + gesture.dx));
-      },
-      onPanResponderRelease: (_, gesture) => {
-        seekTo(progressAtX(progressStartX + gesture.dx));
-        progressDragging.set(false);
-      },
-      onPanResponderTerminate: () => progressDragging.set(false),
-    });
+    const progressPercent = () => duration() > 0 ? Math.max(0, Math.min(100, (position() / duration()) * 100)) : 0;
     return (
       <View style={{ height: 72, minHeight: 72, backgroundColor: pageColor() }}>
         <View
           testID="progress-seek"
           accessibilityLabel={t("Playback progress", "播放进度")}
-          accessibilityValue={{ min: 0, max: duration(), now: displayedPosition() }}
+          accessibilityValue={{ min: 0, max: duration(), now: position() }}
           role="adjustable"
           hitSlop={{ top: 8, bottom: 8 }}
           onPress={(event) => seekTo(progressAtX(event?.position.x ?? 0))}
           onLayout={(event) => trackWidth.set(event.size.width)}
-          {...progressResponder.panHandlers}
           style={{ height: 4, marginHorizontal: 10, backgroundColor: trackColor(), justifyContent: "center" }}
         >
           <View style={{ height: 3, width: `${progressPercent()}%`, backgroundColor: accentColor() }} />
@@ -844,19 +847,13 @@ function App() {
             </View>
           </View>
           <View style={{ width: "6%", flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
-            <View accessibilityLabel={t("Previous track", "上一首")} onPress={playPrevious} hoverStyle={{ backgroundColor: hoverColor() }} activeStyle={{ backgroundColor: pressedColor() }} style={controlStyle(36, 8)}>
-              <LucideIcon name="skipBack" size={26} color={secondaryColor()} />
-            </View>
+            <PlayerTransportButton testID="control-previous" label={t("Previous track", "上一首")} name="skipBack" color={secondaryColor()} onPress={playPrevious} radius={8} />
           </View>
           <View style={{ width: "6%", flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
-            <View accessibilityLabel={paused() ? t("Play", "播放") : t("Pause", "暂停")} onPress={togglePlay} hoverStyle={{ backgroundColor: hoverColor() }} activeStyle={{ backgroundColor: pressedColor() }} style={controlStyle(36)}>
-              <LucideIcon name={paused() ? "play" : "pause"} size={26} color={accentColor()} />
-            </View>
+            <PlayerTransportButton testID="control-play-pause" label={paused() ? t("Play", "播放") : t("Pause", "暂停")} name={paused() ? "play" : "pause"} color={accentColor()} onPress={togglePlay} />
           </View>
           <View style={{ width: "6%", flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
-            <View accessibilityLabel={t("Next track", "下一首")} onPress={playNext} hoverStyle={{ backgroundColor: hoverColor() }} activeStyle={{ backgroundColor: pressedColor() }} style={controlStyle(36, 8)}>
-              <LucideIcon name="skipForward" size={26} color={secondaryColor()} />
-            </View>
+            <PlayerTransportButton testID="control-next" label={t("Next track", "下一首")} name="skipForward" color={secondaryColor()} onPress={playNext} radius={8} />
           </View>
           <View style={{ width: "6%", flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
             <View accessibilityLabel={t("Shuffle", "随机播放")} onPress={() => mode.set(mode() === "random" ? "order" : "random")} style={controlStyle(20)}>
@@ -864,7 +861,7 @@ function App() {
             </View>
           </View>
           <View style={{ width: "25%", alignItems: "center", justifyContent: "center" }}>
-            <Text style={textStyle(14, textColor())}>{timeLabel(displayedPosition())} / {timeLabel(duration())}</Text>
+            <Text style={textStyle(14, textColor())}>{timeLabel(position())} / {timeLabel(duration())}</Text>
           </View>
           <View style={{ width: "10%", alignItems: "center", justifyContent: "center" }}>
             <View accessibilityLabel={t("Mute", "静音")} onPress={() => { const next = volume() > 0 ? 0 : 0.8; volume.set(next); Music.setVolume(next); void Storage.setItem("zeedle.volume", String(next)); }} hoverStyle={{ backgroundColor: hoverColor() }} activeStyle={{ backgroundColor: pressedColor() }} style={{ width: 28, height: 30, alignItems: "center", justifyContent: "center" }}>
@@ -952,8 +949,10 @@ function App() {
           </View>
           {page() === 0 ? <PlayerPanel /> : null}
           {showSpectrum() ? (
-            <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 60, flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 3, opacity: 0.28, zIndex: 5 }}>
-              {spectrumBars().map((bar) => <View style={{ flex: 1, height: Math.max(2, bar * 50), marginHorizontal: 1, backgroundColor: accentColor() }} />)}
+            <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 60, alignItems: "center", justifyContent: "flex-end", zIndex: 5 }}>
+              <View style={{ width: "50%", height: 60, flexDirection: "row", alignItems: "flex-end", opacity: 0.3 }}>
+                {spectrumBars().map((bar) => <View style={{ flex: 1, height: Math.max(0, Math.min(1, bar)) * 60, borderRadius: 1, backgroundColor: accentColor() }} />)}
+              </View>
             </View>
           ) : null}
         </View>

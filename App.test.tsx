@@ -175,10 +175,10 @@ test("the About page links to NSH", async () => {
   await app.press("id:nav-4");
   await app.waitFor("text:NSH");
   await app.press("id:about-nsh-link");
-  expect(app.openedUrls()).toContain("https://nsh.dev");
+  await app.waitUntil(() => app.openedUrls().includes("https://nsh.dev"));
 });
 
-test("dragging the progress bar seeks the playing song", async () => {
+test("clicking the progress bar seeks the playing song", async () => {
   const app = await open("./App.tsx", {
     width: 900,
     height: 510,
@@ -200,11 +200,30 @@ test("dragging the progress bar seeks the playing song", async () => {
   await app.wait(150);
   const tapped = (JSON.parse(Music.state()) as { position: number }).position;
   expect(tapped > started.position + started.duration * 0.4).toBe(true);
+});
+
+test("dragging the progress bar does not seek", async () => {
+  const app = await open("./App.tsx", {
+    width: 900,
+    height: 510,
+    platform: "windows",
+    colorScheme: "dark",
+    storage: {
+      "zeedle.music-directory": "D:/rs-projects/zeedle-slint/audios",
+      "zeedle.light-theme": "false",
+      "zeedle.show-spectrum": "false",
+    },
+  });
+
+  await app.waitFor("text:一眼万年 - S.H.E");
+  await app.press("text:一眼万年");
+  await app.press("text:一眼万年");
+  await app.wait(150);
   const before = (JSON.parse(Music.state()) as { position: number }).position;
   await app.drag("id:progress-seek", { x: 150, y: 0 });
   await app.wait(150);
   const after = (JSON.parse(Music.state()) as { position: number }).position;
-  expect(after > before + 10).toBe(true);
+  expect(after < before + 5).toBe(true);
 });
 
 test("mounted settings restyle when the system appearance changes", async () => {
