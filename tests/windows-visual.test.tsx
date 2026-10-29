@@ -28,6 +28,8 @@ test("Windows transport controls stay centered and pause remains stable", async 
   await app.press("id:nav-4");
   await app.waitFor("id:about-nsh-link");
   expect(app.shows("id:about-nsh-link")).toBe(true);
+  await app.press("id:about-nsh-link");
+  expect(app.shows("id:screen-4")).toBe(true);
   await app.press("id:theme-toggle");
   await app.press("id:nav-0");
   await app.waitFor("id:control-play-pause");

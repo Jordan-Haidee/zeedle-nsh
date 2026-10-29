@@ -20,6 +20,10 @@ public class StartupProbe {
   [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
   [DllImport("user32.dll", EntryPoint="SendMessageW")] static extern IntPtr SendMessageIcon(IntPtr h, uint m, UIntPtr w, IntPtr l);
   public static bool HasIcons(IntPtr h) { return SendMessageIcon(h,127,new UIntPtr(1),IntPtr.Zero)!=IntPtr.Zero && SendMessageIcon(h,127,UIntPtr.Zero,IntPtr.Zero)!=IntPtr.Zero; }
+  [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr LoadLibraryEx(string file, IntPtr reserved, uint flags);
+  [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr FindResource(IntPtr module, IntPtr name, IntPtr type);
+  [DllImport("kernel32.dll")] static extern bool FreeLibrary(IntPtr module);
+  public static bool HasEmbeddedIcon(string exe) { var module=LoadLibraryEx(exe,IntPtr.Zero,2); if(module==IntPtr.Zero) return false; try { return FindResource(module,new IntPtr(1),new IntPtr(14))!=IntPtr.Zero; } finally { FreeLibrary(module); } }
   [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr h, IntPtr dc, uint flags);
   public static IntPtr Find(int id) {
     IntPtr found = IntPtr.Zero;
@@ -63,8 +67,9 @@ try {
   Start-Sleep -Milliseconds 150
   [StartupProbe]::Capture($handle, (Join-Path (Get-Location) 'target/windows-packaged-startup.png'))
   $hasIcons = [StartupProbe]::HasIcons($handle)
-  [PSCustomObject]@{ HiddenSamples=$hidden; VisibleAfterMs=$timer.ElapsedMilliseconds; CenterErrorX=$dx; CenterErrorY=$dy; TaskbarIcons=$hasIcons; Width=($rect.Right-$rect.Left); Height=($rect.Bottom-$rect.Top); Left=$rect.Left; Top=$rect.Top; WorkLeft=$info.Work.Left; WorkTop=$info.Work.Top; WorkRight=$info.Work.Right; WorkBottom=$info.Work.Bottom } | Format-List
-  if ($hidden -eq 0 -or $dx -gt 1 -or $dy -gt 1 -or !$hasIcons) { throw 'Startup visibility, centering, or taskbar icon check failed' }
+  $hasEmbeddedIcon = [StartupProbe]::HasEmbeddedIcon((Resolve-Path .nsh/out/Zeedle/Zeedle.exe).Path)
+  [PSCustomObject]@{ HiddenSamples=$hidden; VisibleAfterMs=$timer.ElapsedMilliseconds; CenterErrorX=$dx; CenterErrorY=$dy; TaskbarIcons=$hasIcons; EmbeddedExeIcon=$hasEmbeddedIcon; Width=($rect.Right-$rect.Left); Height=($rect.Bottom-$rect.Top); Left=$rect.Left; Top=$rect.Top; WorkLeft=$info.Work.Left; WorkTop=$info.Work.Top; WorkRight=$info.Work.Right; WorkBottom=$info.Work.Bottom } | Format-List
+  if ($hidden -eq 0 -or $dx -gt 1 -or $dy -gt 1 -or !$hasIcons -or !$hasEmbeddedIcon) { throw 'Startup visibility, centering, or packaged icon check failed' }
 } finally {
   if ($handle -ne [IntPtr]::Zero) { [void][StartupProbe]::PostMessage($handle,16,[IntPtr]::Zero,[IntPtr]::Zero) }
   [void]$launched.WaitForExit(5000)
