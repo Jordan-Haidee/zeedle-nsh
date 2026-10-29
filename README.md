@@ -43,20 +43,38 @@ nsh test App.test.tsx
 
 Playback integration tests use songs from the default Music folder, including **一眼万年**, **万疆**, **Deadman** and **Love Story**. Keep those tracks and their lyric metadata available when running the full suite; no copyrighted audio is included in this repository.
 
-## Package for Windows
+## Supported platforms and portable builds
+
+Portable releases currently target Windows x64, Linux x64 and Apple Silicon macOS. The release workflow runs on each native platform, packages the app, captures its library, settings and About pages, and publishes only when all three jobs pass.
+
+Build locally with NSH 0.3.0 and Rust:
+
+```sh
+nsh package --target linux
+nsh package --target macos
+```
+
+On Windows, use the packaging script to include Zeedle's centered startup launcher and icon:
 
 ```powershell
 powershell -File scripts/package-windows.ps1
 ```
 
-The script builds the NSH bundle and Zeedle's Windows launcher. The launcher waits until the music library and first UI are ready, then opens centered with the Zeedle icon. Distribute the complete `.nsh/out/Zeedle` folder or `.nsh/out/Zeedle.zip`.
+The portable files attached to each GitHub Release are named `Zeedle-v<version>-windows-x86_64.zip`, `Zeedle-v<version>-linux-x86_64.tar.gz` and `Zeedle-v<version>-macos-aarch64.zip`. Linux requires GTK 4.14 and WebKitGTK 6.0; macOS requires version 14 or newer. The macOS archive contains an ad hoc signed `.app` bundle. Windows and Linux packages are directories archived in their platform's standard format.
+
+Push a tag matching the version in `nsh.json` (for example, `v0.6.5`) to build all three archives and publish a GitHub Release. The Actions workflow can also be started manually to validate packaging and screenshots without publishing.
 
 For Windows rendering and startup checks:
 
 ```sh
 nsh test tests/windows-visual.test.tsx --target windows
+nsh test tests/platform-render.test.tsx --target windows
+nsh test tests/platform-render.test.tsx --target linux
+nsh test tests/platform-render.test.tsx --target macos
 powershell -File scripts/check-windows-startup.ps1
 ```
+
+The platform render test captures the library, settings and About screens from each native desktop host. CI runs the Linux test in Xvfb and uploads all nine screenshots for review.
 
 ## Project structure
 
