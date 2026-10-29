@@ -1,0 +1,162 @@
+name: Portable release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            os: windows-latest
+            platform: windows
+            arch: x86_64
+          - name: Windows ARM64
+            os: windows-11-arm
+            platform: windows
+            arch: aarch64
+          - name: Linux x64
+            os: ubuntu-24.04
+            platform: linux
+            arch: x86_64
+          - name: Linux ARM64
+            os: ubuntu-24.04-arm
+            platform: linux
+            arch: aarch64
+          - name: macOS Intel
+            os: macos-15-intel
+            platform: macos
+            arch: x86_64
+          - name: macOS Apple Silicon
+            os: macos-15
+            platform: macos
+            arch: aarch64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential libasound2-dev libdbus-1-dev libfontconfig1-dev \
+            libfreetype6-dev libgtk-4-dev libxkbcommon-dev pkg-config
+
+      - name: Install NSH on Windows x64
+        if: runner.os == 'Windows' && matrix.arch == 'x86_64'
+        shell: pwsh
+        run: |
+          irm https://nsh.dev/install.ps1 | iex
+          "$env:LOCALAPPDATA\nsh\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Install NSH from source on Linux and macOS
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          curl -fsSL https://nsh.dev/install.sh | sh -s -- --source
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build NSH distribution on Windows ARM64
+        if: runner.os == 'Windows' && matrix.arch == 'aarch64'
+        shell: pwsh
+        run: |
+          git clone --depth 1 --branch v0.3.0 https://github.com/longbridge/nsh.git "$env:RUNNER_TEMP/nsh"
+          Push-Location "$env:RUNNER_TEMP/nsh"
+          try { cargo xtask dist } finally { Pop-Location }
+          "$env:RUNNER_TEMP\nsh\dist\nsh\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Validate release tag
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          app_version="$(jq -r .version nsh.json)"
+          if [[ "$GITHUB_EVENT_NAME" == push && "$version" != "$app_version" ]]; then
+            echo "Tag $GITHUB_REF_NAME does not match nsh.json version $app_version" >&2
+            exit 1
+          fi
+
+      - name: Package Windows portable archive
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/package-windows.ps1
+
+      - name: Package Linux portable archive
+        if: runner.os == 'Linux'
+        shell: bash
+        run: nsh package --target linux
+
+      - name: Package macOS portable archive
+        if: runner.os == 'macOS'
+        shell: bash
+        run: nsh package --target macos
+
+      - name: Name Linux archive
+        if: runner.os == 'Linux'
+        shell: bash
+        run: mv .nsh/out/Zeedle.tar.gz "Zeedle-${GITHUB_REF_NAME}-linux-${{ matrix.arch }}.tar.gz"
+
+      - name: Name macOS archive
+        if: runner.os == 'macOS'
+        shell: bash
+        run: ditto -c -k --sequesterRsrc --keepParent .nsh/out/Zeedle.app "Zeedle-${GITHUB_REF_NAME}-macos-${{ matrix.arch }}.zip"
+
+      - name: Name Windows archive
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Move-Item .nsh/out/Zeedle.zip "Zeedle-$($env:GITHUB_REF_NAME)-windows-${{ matrix.arch }}.zip"
+
+      - name: Upload portable archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zeedle-${{ github.ref_name }}-${{ matrix.platform }}-${{ matrix.arch }}
+          path: Zeedle-${{ github.ref_name }}-${{ matrix.platform }}-${{ matrix.arch }}.*
+          if-no-files-found: error
+          compression-level: 0
+
+  publish:
+    name: Publish GitHub Release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: Zeedle-${{ github.ref_name }}-*
+          merge-multiple: true
+
+      - name: Verify all portable archives
+        shell: bash
+        run: |
+          count=$(find dist -maxdepth 1 -type f | wc -l)
+          if [[ "$count" -ne 6 ]]; then
+            echo "Expected six portable archives, found $count" >&2
+            find dist -maxdepth 1 -type f -print >&2
+            exit 1
+          fi
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME" dist/*
+          --repo "$GITHUB_REPOSITORY"
+          --verify-tag
+          --title "$GITHUB_REF_NAME"
+          --generate-notes
