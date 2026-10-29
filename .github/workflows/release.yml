@@ -20,21 +20,9 @@ jobs:
             os: windows-latest
             platform: windows
             arch: x86_64
-          - name: Windows ARM64
-            os: windows-11-arm
-            platform: windows
-            arch: aarch64
           - name: Linux x64
             os: ubuntu-24.04
             platform: linux
-            arch: x86_64
-          - name: Linux ARM64
-            os: ubuntu-24.04-arm
-            platform: linux
-            arch: aarch64
-          - name: macOS Intel
-            os: macos-15-intel
-            platform: macos
             arch: x86_64
           - name: macOS Apple Silicon
             os: macos-15
@@ -60,24 +48,17 @@ jobs:
         if: runner.os == 'Windows' && matrix.arch == 'x86_64'
         shell: pwsh
         run: |
+          $env:NSH_VERSION = 'v0.3.0'
           irm https://nsh.dev/install.ps1 | iex
           "$env:LOCALAPPDATA\nsh\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 
-      - name: Install NSH from source on Linux and macOS
-        if: runner.os != 'Windows'
+      - name: Install NSH prebuilt on Linux x64 and macOS Apple Silicon
+        if: runner.os == 'Linux' || runner.os == 'macOS'
         shell: bash
         run: |
-          curl -fsSL https://nsh.dev/install.sh | sh -s -- --source
+          export NSH_VERSION=v0.3.0
+          curl -fsSL https://nsh.dev/install.sh | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Build NSH distribution on Windows ARM64
-        if: runner.os == 'Windows' && matrix.arch == 'aarch64'
-        shell: pwsh
-        run: |
-          git clone --depth 1 --branch v0.3.0 https://github.com/longbridge/nsh.git "$env:RUNNER_TEMP/nsh"
-          Push-Location "$env:RUNNER_TEMP/nsh"
-          try { cargo xtask dist } finally { Pop-Location }
-          "$env:RUNNER_TEMP\nsh\dist\nsh\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 
       - name: Validate release tag
         shell: bash
@@ -145,8 +126,8 @@ jobs:
         shell: bash
         run: |
           count=$(find dist -maxdepth 1 -type f | wc -l)
-          if [[ "$count" -ne 6 ]]; then
-            echo "Expected six portable archives, found $count" >&2
+          if [[ "$count" -ne 3 ]]; then
+            echo "Expected three portable archives, found $count" >&2
             find dist -maxdepth 1 -type f -print >&2
             exit 1
           fi
