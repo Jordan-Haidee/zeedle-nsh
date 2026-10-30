@@ -25,7 +25,19 @@ try {
     [System.Text.UTF8Encoding]::new($false)
   )
 
-  & nsh run @NshArguments
+  $hasWindowSize = $false
+  foreach ($argument in $NshArguments) {
+    if ($argument -eq '--window-size' -or $argument.StartsWith('--window-size=')) {
+      $hasWindowSize = $true
+      break
+    }
+  }
+
+  if ($hasWindowSize) {
+    & nsh run @NshArguments
+  } else {
+    & nsh run --window-size 900x510 @NshArguments
+  }
   if ($null -ne $LASTEXITCODE) { $exitCode = $LASTEXITCODE }
 } finally {
   try {

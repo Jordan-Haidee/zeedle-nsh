@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use nsh_base::{input, theme};
 use nsh_core::{
-    LayoutAnimation, LayoutCurve, LayoutTransition,
+    EllipsizeMode, LayoutAnimation, LayoutCurve, LayoutTransition,
     desktop::TitleBarStyle,
     element::{IntoElement, desktop},
     platform::Appearance,
@@ -66,6 +66,12 @@ struct UiState {
 }
 
 const COVER: nsh_core::element::FileAsset = asset!("cover.svg");
+
+fn text(content: impl IntoReactive<SharedString>) -> Text {
+    nsh_core::element::text(content)
+        .number_of_lines(1)
+        .ellipsize_mode(EllipsizeMode::Tail)
+}
 
 fn color_token(name: &'static str) -> AdaptiveColor {
     theme().color(name).unwrap_or(theme().foreground)
@@ -736,8 +742,11 @@ pub fn App() -> impl IntoElement {
     view()
         .flex_1()
         .flex_col()
+        .on_press(move || app.selected_action.set(None))
         .bg(move || color_token("page"))
         .border_1()
+        .min_w(px(850.0))
+        .min_h(px(500.0))
         .border_color(move || color_token("border"))
         .child(
             view()
@@ -955,6 +964,7 @@ pub fn App() -> impl IntoElement {
                         .on_press(move || error.set(String::new()))
                         .child(
                             text(move || error.get())
+                                .number_of_lines(2)
                                 .text_size(px(11.0))
                                 .text_color(move || color_token("danger-text")),
                         )
@@ -1232,65 +1242,84 @@ fn begin_edit(app: UiState, song: SongInfo) {
 }
 
 fn action_menu(app: UiState) -> impl IntoElement {
-    let selected = app.selected_action.get();
-    let edit_song = selected.clone();
-    let delete_song = selected.clone();
     view()
-        .test_id("song-action-menu")
         .absolute()
-        .left(move || px(app.action_position.get().x.0))
-        .top(move || px(app.action_position.get().y.0))
+        .left(px(0.0))
+        .right(px(0.0))
+        .top(px(0.0))
+        .bottom(px(0.0))
         .z_index(25)
-        .p(px(8.0))
-        .flex_col()
-        .gap(px(4.0))
-        .rounded(px(8.0))
-        .border_1()
-        .border_color(move || color_token("border"))
-        .bg(move || color_token("panel"))
         .child(
-            text(move || {
-                selected
-                    .as_ref()
-                    .map_or_else(String::new, |song| song.song_name.clone())
-            })
-            .px(px(8.0))
-            .py(px(6.0))
-            .text_size(px(12.0))
-            .text_color(move || color_token("text-secondary")),
+            view()
+                .test_id("action-menu-backdrop")
+                .absolute()
+                .left(px(0.0))
+                .right(px(0.0))
+                .top(px(0.0))
+                .bottom(px(0.0))
+                .on_press(move || app.selected_action.set(None)),
         )
         .child(
             view()
-                .px(px(12.0))
-                .py(px(7.0))
-                .rounded(px(4.0))
-                .hover(|style| style.bg(move || color_token("hover")))
-                .on_press(move || {
-                    app.selected_action.set(None);
-                    if let Some(song) = edit_song.clone() {
-                        begin_edit(app, song);
-                    }
-                })
+                .test_id("song-action-menu")
+                .absolute()
+                .left(move || px(app.action_position.get().x.0))
+                .top(move || px(app.action_position.get().y.0))
+                .z_index(26)
+                .max_w(px(240.0))
+                .p(px(8.0))
+                .flex_col()
+                .gap(px(4.0))
+                .rounded(px(8.0))
+                .border_1()
+                .border_color(move || color_token("border"))
+                .bg(move || color_token("panel"))
                 .child(
-                    text(move || localized(&app.language.get(), "Edit metadata…"))
-                        .text_size(px(13.0))
-                        .text_color(move || theme().foreground),
-                ),
-        )
-        .child(
-            view()
-                .px(px(12.0))
-                .py(px(7.0))
-                .rounded(px(4.0))
-                .hover(|style| style.bg(move || color_token("hover")))
-                .on_press(move || {
-                    app.delete_target.set(delete_song.clone());
-                    app.selected_action.set(None);
-                })
+                    text(move || {
+                        app.selected_action
+                            .get()
+                            .map_or_else(String::new, |song| song.song_name)
+                    })
+                    .px(px(8.0))
+                    .py(px(6.0))
+                    .text_size(px(12.0))
+                    .text_color(move || color_token("text-secondary")),
+                )
                 .child(
-                    text(move || localized(&app.language.get(), "Delete song…"))
-                        .text_size(px(13.0))
-                        .text_color(move || theme().destructive),
+                    view()
+                        .px(px(12.0))
+                        .py(px(7.0))
+                        .rounded(px(4.0))
+                        .hover(|style| style.bg(move || color_token("hover")))
+                        .on_press(move || {
+                            let selected = app.selected_action.get();
+                            app.selected_action.set(None);
+                            if let Some(song) = selected {
+                                begin_edit(app, song);
+                            }
+                        })
+                        .child(
+                            text(move || localized(&app.language.get(), "Edit metadata…"))
+                                .text_size(px(13.0))
+                                .text_color(move || theme().foreground),
+                        ),
+                )
+                .child(
+                    view()
+                        .px(px(12.0))
+                        .py(px(7.0))
+                        .rounded(px(4.0))
+                        .hover(|style| style.bg(move || color_token("hover")))
+                        .on_press(move || {
+                            let selected = app.selected_action.get();
+                            app.delete_target.set(selected);
+                            app.selected_action.set(None);
+                        })
+                        .child(
+                            text(move || localized(&app.language.get(), "Delete song…"))
+                                .text_size(px(13.0))
+                                .text_color(move || theme().destructive),
+                        ),
                 ),
         )
 }
@@ -1566,6 +1595,7 @@ fn editor_overlay(app: UiState, refresh: impl Fn(String) + Copy + 'static) -> im
                                                     app.edit_lyrics_preview.get()
                                                 }
                                             })
+                                            .number_of_lines(0)
                                             .text_size(px(11.0))
                                             .text_color(move || theme().foreground),
                                         ),
@@ -1604,6 +1634,7 @@ fn editor_overlay(app: UiState, refresh: impl Fn(String) + Copy + 'static) -> im
                         move || !app.edit_error.get().is_empty(),
                         move || {
                             text(move || app.edit_error.get())
+                                .number_of_lines(2)
                                 .text_size(px(11.0))
                                 .text_color(move || theme().destructive)
                         },

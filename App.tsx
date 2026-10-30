@@ -1,4 +1,4 @@
-import { Image, LayoutAnimation, List, Scroll, Storage, Text, View, colorScheme, keymap, mount, setColorScheme, signal, token, type YNode } from "nsh";
+import { effect, Image, LayoutAnimation, List, Scroll, Storage, Text as NshText, View, colorScheme, keymap, mount, setColorScheme, signal, split, token, windowSize, type YNode } from "nsh";
 import { Input } from "nsh/base";
 import { Menu, titleBar, Window } from "nsh/desktop";
 import { Music } from "zeedle-nsh/native";
@@ -12,6 +12,17 @@ type PlayMode = "order" | "repeat" | "random";
 type SongInfo = { id: number; song_name: string; singer: string; duration: string; duration_secs: number; song_path: string };
 type LyricItem = { time: number; duration: number; text: string };
 type PlaybackState = { position: number; duration: number; paused: boolean; volume: number; error: string; spectrum: number[] };
+
+type NshTextProps = Parameters<typeof NshText>[0];
+function Text(props: NshTextProps) {
+  const [, rest] = split(props, ["numberOfLines", "ellipsizeMode", "children"] as const);
+  return (
+    <NshText {...rest} numberOfLines={props.numberOfLines ?? 1} ellipsizeMode={props.ellipsizeMode ?? "tail"}>
+      {props.children}
+    </NshText>
+  );
+}
+
 function timeLabel(seconds: number) {
   const value = Math.max(0, Math.floor(seconds || 0));
   return `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
@@ -75,6 +86,12 @@ function App() {
   Window.setTitle("Zeedle");
   Window.setTitleBar("hidden", 40);
   Window.setFrame({ size: { width: 900, height: 510 } });
+  effect(() => {
+    const size = windowSize();
+    if (size.width > 0 && size.height > 0 && (size.width < 850 || size.height < 500)) {
+      Window.setFrame({ size: { width: Math.max(size.width, 850), height: Math.max(size.height, 500) }, anchorTop: true });
+    }
+  });
 
   const displayedSongs = () => {
     const items = [...songs()];
@@ -859,7 +876,7 @@ function App() {
     return (
       <View testID="screen-4" style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: pageColor(), gap: 10 }}>
         <Image src={cover} style={{ width: 120, height: 120 }} />
-        <Text style={{ ...textStyle(14, textColor()), textAlign: "center" }}>
+        <Text numberOfLines={2} style={{ ...textStyle(14, textColor()), textAlign: "center" }}>
           {`Zeedle\n${t("Music at the speed of a blink, designed for pure simplicity", "以眨眼般的速度享受音乐，追求纯粹简洁")}`}
         </Text>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }}>
@@ -872,7 +889,7 @@ function App() {
             <Text style={{ ...textStyle(14, accentColor()), textDecorationLine: "underline" }}>NSH</Text>
           </View>
         </View>
-        <Text style={{ ...textStyle(14, textColor()), textAlign: "center" }}>{t("Author:", "作者：")} Jordan Haidee{"\n"}{t("Version:", "版本：")} 0.1.1</Text>
+        <Text numberOfLines={2} style={{ ...textStyle(14, textColor()), textAlign: "center" }}>{t("Author:", "作者：")} Jordan Haidee{"\n"}{t("Version:", "版本：")} 0.1.1</Text>
         <View role="link" accessibilityLabel="Github" onPress={() => void openExternalUrl("https://github.com/Jordan-Haidee/Zeedle")}>
           <Text style={{ ...textStyle(14, accentColor()), textDecorationLine: "underline" }}>Github</Text>
         </View>
@@ -941,7 +958,7 @@ function App() {
   }
 
   return (
-    <View style={{ flex: 1, flexDirection: "column", backgroundColor: pageColor(), borderWidth: 1, borderColor: lineColor(), overflow: "hidden" }}>
+    <View style={{ flex: 1, minWidth: 850, minHeight: 500, flexDirection: "column", backgroundColor: pageColor(), borderWidth: 1, borderColor: lineColor(), overflow: "hidden" }}>
       <View
         desktop={{ windowDrag: true }}
         style={{ height: titleBar().height || 40, minHeight: 40, flexDirection: "row", alignItems: "center", paddingLeft: titleBar().left + 10, paddingRight: titleBar().right, backgroundColor: panelColor(), borderBottomWidth: 1, borderBottomColor: lineColor() }}
@@ -1067,7 +1084,7 @@ function App() {
                 <Text style={textStyle(14, textColor(), "600")}>{t("Lyrics", "歌词")}</Text>
                 <Scroll style={{ height: 100, minHeight: 100, marginTop: -1, padding: 8, borderRadius: 4, backgroundColor: raisedColor() }}>
                   {(editLyricsPreview() || t("No embedded lyrics", "没有内嵌歌词")).split(/\r?\n/).map((line) => (
-                    <Text numberOfLines={1} ellipsizeMode="clip" style={{ ...textStyle(11, textColor()), lineHeight: 13 }}>{line}</Text>
+                  <Text numberOfLines={1} style={{ ...textStyle(11, textColor()), lineHeight: 13 }}>{line}</Text>
                   ))}
                 </Scroll>
                 <View onPress={() => void chooseEditLyrics()} style={{ height: 32, alignItems: "center", justifyContent: "center", borderRadius: 4, backgroundColor: raisedColor() }}>
@@ -1096,7 +1113,7 @@ function App() {
           <View style={{ width: 370, maxWidth: "100%", padding: 20, borderRadius: 8, borderWidth: 1, borderColor: lineColor(), backgroundColor: pageColor(), gap: 11 }}>
             <Text style={textStyle(17, textColor(), "600")}>{t("Delete this song?", "删除这首歌曲？")}</Text>
             <Text style={textStyle(13, textColor(), "500")}>{deleteTarget()?.song_name}</Text>
-            <Text style={textStyle(11, secondaryColor())}>{t("The audio file will be removed from your device.", "此音频文件将从设备中删除。")}</Text>
+            <Text numberOfLines={2} style={textStyle(11, secondaryColor())}>{t("The audio file will be removed from your device.", "此音频文件将从设备中删除。")}</Text>
             <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 5 }}>
               <View testID="delete-cancel" onPress={() => deleteTarget.set(null)} style={{ paddingHorizontal: 13, paddingVertical: 8, borderRadius: 4, backgroundColor: raisedColor() }}>
                 <Text style={textStyle(12, secondaryColor(), "500")}>{t("Cancel", "取消")}</Text>

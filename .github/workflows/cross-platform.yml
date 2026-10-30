@@ -19,10 +19,13 @@ jobs:
         include:
           - name: Windows x64
             os: windows-latest
+            target: windows
           - name: Linux x64
             os: ubuntu-24.04
+            target: linux
           - name: macOS Apple Silicon
             os: macos-15
+            target: macos
 
     steps:
       - uses: actions/checkout@v4
@@ -30,6 +33,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
 
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
@@ -43,10 +50,103 @@ jobs:
             libfreetype6-dev \
             libgtk-4-dev \
             libxkbcommon-dev \
-            pkg-config
+            libwebkitgtk-6.0-dev \
+            pkg-config \
+            xvfb
+
+      - name: Install NSH on Windows x64
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:NSH_VERSION = 'v0.3.0'
+          irm https://nsh.dev/install.ps1 | iex
+          "$env:LOCALAPPDATA\nsh\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Install NSH on Linux and macOS
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          export NSH_VERSION=v0.3.0
+          curl -fsSL https://nsh.dev/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Build
         run: cargo build --locked
 
       - name: Run Rust tests
         run: cargo test --locked
+
+      - name: Check TSX UI
+        run: nsh check -v
+
+      - name: Render TSX UI
+        if: runner.os != 'Linux'
+        run: nsh test tests/platform-render.test.tsx --target ${{ matrix.target }}
+
+      - name: Render TSX UI on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a nsh test tests/platform-render.test.tsx --target linux
+
+      - name: Render Rust UI
+        if: runner.os != 'Linux'
+        run: python scripts/with-rust-root.py nsh test tests/rust-platform-render.test.tsx --target ${{ matrix.target }}
+
+      - name: Render Rust UI on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a python scripts/with-rust-root.py nsh test tests/rust-platform-render.test.tsx --target linux
+
+      - name: Test Rust context menu
+        if: runner.os != 'Linux'
+        run: python scripts/with-rust-root.py nsh test tests/rust-context-menu.test.tsx --target ${{ matrix.target }}
+
+      - name: Test Rust context menu on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a python scripts/with-rust-root.py nsh test tests/rust-context-menu.test.tsx --target linux
+
+      - name: Package Windows TSX UI
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./scripts/package-windows.ps1
+          Move-Item .nsh/out/Zeedle.zip .nsh/out/Zeedle-tsxui.zip
+
+      - name: Package Windows Rust UI
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python scripts/with-rust-root.py nsh package --target windows --out .nsh/out/rustui
+          Move-Item .nsh/out/rustui/Zeedle.zip .nsh/out/Zeedle-rustui.zip
+
+      - name: Package Linux UIs
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          xvfb-run -a nsh package --target linux --out .nsh/out/tsxui
+          xvfb-run -a python scripts/with-rust-root.py nsh package --target linux --out .nsh/out/rustui
+
+      - name: Package macOS UIs
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          nsh package --target macos --out .nsh/out/tsxui
+          python scripts/with-rust-root.py nsh package --target macos --out .nsh/out/rustui
+
+      - name: Archive macOS TSX UI
+        if: runner.os == 'macOS'
+        run: ditto -c -k --sequesterRsrc --keepParent .nsh/out/tsxui/Zeedle.app .nsh/out/Zeedle-tsxui.zip
+
+      - name: Archive macOS Rust UI
+        if: runner.os == 'macOS'
+        run: ditto -c -k --sequesterRsrc --keepParent .nsh/out/rustui/Zeedle.app .nsh/out/Zeedle-rustui.zip
+
+      - name: Upload packaged UIs
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.target }}
+          path: |
+            .nsh/out/Zeedle-tsxui.zip
+            .nsh/out/Zeedle-rustui.zip
+            .nsh/out/tsxui/Zeedle.tar.gz
+            .nsh/out/rustui/Zeedle.tar.gz
+          if-no-files-found: error
+          compression-level: 0

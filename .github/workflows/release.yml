@@ -10,27 +10,42 @@ permissions:
 
 jobs:
   build:
-    name: ${{ matrix.name }}
+    name: ${{ matrix.ui }} / ${{ matrix.platform }} ${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: Windows x64
-            os: windows-latest
+          - os: windows-latest
             platform: windows
             target: windows
             arch: x86_64
-          - name: Linux x64
-            os: ubuntu-24.04
+            ui: tsxui
+          - os: windows-latest
+            platform: windows
+            target: windows
+            arch: x86_64
+            ui: rustui
+          - os: ubuntu-24.04
             platform: linux
             target: linux
             arch: x86_64
-          - name: macOS Apple Silicon
-            os: macos-15
+            ui: tsxui
+          - os: ubuntu-24.04
+            platform: linux
+            target: linux
+            arch: x86_64
+            ui: rustui
+          - os: macos-15
             platform: macos
             target: macos
             arch: aarch64
+            ui: tsxui
+          - os: macos-15
+            platform: macos
+            target: macos
+            arch: aarch64
+            ui: rustui
 
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +53,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
 
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
@@ -49,15 +68,15 @@ jobs:
             libxkbcommon-dev pkg-config xvfb
 
       - name: Install NSH on Windows x64
-        if: runner.os == 'Windows' && matrix.arch == 'x86_64'
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $env:NSH_VERSION = 'v0.3.0'
           irm https://nsh.dev/install.ps1 | iex
           "$env:LOCALAPPDATA\nsh\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 
-      - name: Install NSH prebuilt on Linux x64 and macOS Apple Silicon
-        if: runner.os == 'Linux' || runner.os == 'macOS'
+      - name: Install NSH on Linux and macOS
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           export NSH_VERSION=v0.3.0
@@ -74,57 +93,81 @@ jobs:
             exit 1
           fi
 
-      - name: Package Windows portable archive
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: ./scripts/package-windows.ps1
+      - name: Check UI sources
+        run: nsh check -v
 
-      - name: Package Linux portable archive
-        if: runner.os == 'Linux'
-        shell: bash
-        run: nsh package --target linux
-
-      - name: Package macOS portable archive
-        if: runner.os == 'macOS'
-        shell: bash
-        run: nsh package --target macos
-
-      - name: Render desktop pages and capture screenshots
-        if: runner.os != 'Linux'
+      - name: Render TSX UI
+        if: matrix.ui == 'tsxui' && runner.os != 'Linux'
         run: nsh test tests/platform-render.test.tsx --target ${{ matrix.target }}
 
-      - name: Render desktop pages and capture screenshots on Linux
-        if: runner.os == 'Linux'
+      - name: Render TSX UI on Linux
+        if: matrix.ui == 'tsxui' && runner.os == 'Linux'
         run: xvfb-run -a nsh test tests/platform-render.test.tsx --target linux
 
-      - name: Upload platform screenshots
-        uses: actions/upload-artifact@v4
-        with:
-          name: screenshots-${{ matrix.platform }}-${{ matrix.arch }}
-          path: target/platform-render-*.png
-          if-no-files-found: error
-          compression-level: 0
+      - name: Render Rust UI
+        if: matrix.ui == 'rustui' && runner.os != 'Linux'
+        run: python scripts/with-rust-root.py nsh test tests/rust-platform-render.test.tsx --target ${{ matrix.target }}
 
-      - name: Name Linux archive
+      - name: Render Rust UI on Linux
+        if: matrix.ui == 'rustui' && runner.os == 'Linux'
+        run: xvfb-run -a python scripts/with-rust-root.py nsh test tests/rust-platform-render.test.tsx --target linux
+
+      - name: Test Rust context menu
+        if: matrix.ui == 'rustui' && runner.os != 'Linux'
+        run: python scripts/with-rust-root.py nsh test tests/rust-context-menu.test.tsx --target ${{ matrix.target }}
+
+      - name: Test Rust context menu on Linux
+        if: matrix.ui == 'rustui' && runner.os == 'Linux'
+        run: xvfb-run -a python scripts/with-rust-root.py nsh test tests/rust-context-menu.test.tsx --target linux
+
+      - name: Package Windows TSX UI
+        if: matrix.ui == 'tsxui' && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./scripts/package-windows.ps1
+          Move-Item .nsh/out/Zeedle.zip "Zeedle-$env:GITHUB_REF_NAME-tsxui-windows-${{ matrix.arch }}.zip"
+
+      - name: Package Windows Rust UI
+        if: matrix.ui == 'rustui' && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python scripts/with-rust-root.py nsh package --target windows --out .nsh/out/rustui
+          Move-Item .nsh/out/rustui/Zeedle.zip "Zeedle-$env:GITHUB_REF_NAME-rustui-windows-${{ matrix.arch }}.zip"
+
+      - name: Package Linux UI
         if: runner.os == 'Linux'
         shell: bash
-        run: mv .nsh/out/Zeedle.tar.gz "Zeedle-${GITHUB_REF_NAME}-linux-${{ matrix.arch }}.tar.gz"
+        run: |
+          if [[ "${{ matrix.ui }}" == rustui ]]; then
+            xvfb-run -a python scripts/with-rust-root.py nsh package --target linux --out .nsh/out/rustui
+            archive=".nsh/out/rustui/Zeedle.tar.gz"
+          else
+            xvfb-run -a nsh package --target linux --out .nsh/out/tsxui
+            archive=".nsh/out/tsxui/Zeedle.tar.gz"
+          fi
+          mv "$archive" "Zeedle-${GITHUB_REF_NAME}-${{ matrix.ui }}-linux-${{ matrix.arch }}.tar.gz"
 
-      - name: Name macOS archive
-        if: runner.os == 'macOS'
+      - name: Package macOS TSX UI
+        if: matrix.ui == 'tsxui' && runner.os == 'macOS'
         shell: bash
-        run: ditto -c -k --sequesterRsrc --keepParent .nsh/out/Zeedle.app "Zeedle-${GITHUB_REF_NAME}-macos-${{ matrix.arch }}.zip"
+        run: |
+          nsh package --target macos --out .nsh/out/tsxui
+          ditto -c -k --sequesterRsrc --keepParent .nsh/out/tsxui/Zeedle.app \
+            "Zeedle-${GITHUB_REF_NAME}-tsxui-macos-${{ matrix.arch }}.zip"
 
-      - name: Name Windows archive
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: Move-Item .nsh/out/Zeedle.zip "Zeedle-$($env:GITHUB_REF_NAME)-windows-${{ matrix.arch }}.zip"
+      - name: Package macOS Rust UI
+        if: matrix.ui == 'rustui' && runner.os == 'macOS'
+        shell: bash
+        run: |
+          python scripts/with-rust-root.py nsh package --target macos --out .nsh/out/rustui
+          ditto -c -k --sequesterRsrc --keepParent .nsh/out/rustui/Zeedle.app \
+            "Zeedle-${GITHUB_REF_NAME}-rustui-macos-${{ matrix.arch }}.zip"
 
       - name: Upload portable archive
         uses: actions/upload-artifact@v4
         with:
-          name: Zeedle-${{ github.ref_name }}-${{ matrix.platform }}-${{ matrix.arch }}
-          path: Zeedle-${{ github.ref_name }}-${{ matrix.platform }}-${{ matrix.arch }}.*
+          name: Zeedle-${{ github.ref_name }}-${{ matrix.ui }}-${{ matrix.platform }}-${{ matrix.arch }}
+          path: Zeedle-${{ github.ref_name }}-${{ matrix.ui }}-${{ matrix.platform }}-${{ matrix.arch }}.*
           if-no-files-found: error
           compression-level: 0
 
@@ -145,9 +188,24 @@ jobs:
       - name: Verify all portable archives
         shell: bash
         run: |
+          expected=(
+            "Zeedle-${GITHUB_REF_NAME}-tsxui-windows-x86_64.zip"
+            "Zeedle-${GITHUB_REF_NAME}-rustui-windows-x86_64.zip"
+            "Zeedle-${GITHUB_REF_NAME}-tsxui-linux-x86_64.tar.gz"
+            "Zeedle-${GITHUB_REF_NAME}-rustui-linux-x86_64.tar.gz"
+            "Zeedle-${GITHUB_REF_NAME}-tsxui-macos-aarch64.zip"
+            "Zeedle-${GITHUB_REF_NAME}-rustui-macos-aarch64.zip"
+          )
+          for archive in "${expected[@]}"; do
+            if [[ ! -s "dist/$archive" ]]; then
+              echo "Missing release archive: $archive" >&2
+              find dist -maxdepth 1 -type f -print >&2
+              exit 1
+            fi
+          done
           count=$(find dist -maxdepth 1 -type f | wc -l)
-          if [[ "$count" -ne 3 ]]; then
-            echo "Expected three portable archives, found $count" >&2
+          if [[ "$count" -ne "${#expected[@]}" ]]; then
+            echo "Expected ${#expected[@]} portable archives, found $count" >&2
             find dist -maxdepth 1 -type f -print >&2
             exit 1
           fi
