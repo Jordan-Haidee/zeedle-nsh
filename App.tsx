@@ -1,4 +1,4 @@
-import { Image, LayoutAnimation, List, Scroll, Storage, Text, View, colorScheme, keymap, mount, setColorScheme, signal, token, type YNode } from "nsh";
+import { Image, List, Scroll, Storage, Text, View, colorScheme, keymap, mount, setColorScheme, signal, token, type YNode } from "nsh";
 import { Input } from "nsh/base";
 import { Menu, titleBar, Window } from "nsh/desktop";
 import { Music } from "zeedle-nsh/native";
@@ -504,6 +504,52 @@ function App() {
     );
   }
 
+  function VolumeControl() {
+    const hovered = signal(false);
+    const setVolumeAt = (y: number) => {
+      const next = Math.max(0, Math.min(1, 1 - y / 55));
+      volume.set(next);
+      Music.setVolume(next);
+      void Storage.setItem("zeedle.volume", String(next));
+    };
+    return (
+      <View
+        style={{ width: "100%", height: 68, position: "relative", alignItems: "center", justifyContent: "center" }}
+        onHoverIn={() => hovered.set(true)}
+        onHoverOut={() => hovered.set(false)}
+      >
+        {hovered() ? (
+          <View
+            accessibilityLabel={t("Volume", "音量")}
+            accessibilityValue={{ min: 0, max: 1, now: volume() }}
+            role="adjustable"
+            onPress={(event) => setVolumeAt(event?.position.y ?? 27.5)}
+            style={{ position: "absolute", right: 13, top: 6, width: 20, height: 55 }}
+          >
+            <View pointerEvents="none" style={{ position: "absolute", left: 8, top: 0, width: 4, height: 55, borderRadius: 2, backgroundColor: trackColor() }}>
+              <View style={{ position: "absolute", left: 0, bottom: 0, width: 4, height: 55 * volume(), borderRadius: 2, backgroundColor: accentColor() }} />
+              <View style={{ position: "absolute", left: -3, bottom: Math.max(0, Math.min(50, 55 * volume() - 5)), width: 10, height: 10, borderRadius: 5, borderWidth: 1, borderColor: pageColor(), backgroundColor: accentColor() }} />
+            </View>
+          </View>
+        ) : null}
+        <View
+          accessibilityLabel={t("Mute", "静音")}
+          onPress={() => {
+            const next = volume() > 0 ? 0 : 0.8;
+            volume.set(next);
+            Music.setVolume(next);
+            void Storage.setItem("zeedle.volume", String(next));
+          }}
+          hoverStyle={{ backgroundColor: hoverColor() }}
+          activeStyle={{ backgroundColor: pressedColor() }}
+          style={{ width: 28, height: 30, alignItems: "center", justifyContent: "center" }}
+        >
+          <LucideIcon name="volume2" size={20} color={hovered() ? accentColor() : secondaryColor()} />
+        </View>
+      </View>
+    );
+  }
+
   function SideButton(props: { icon: LucideName; label: string; target: Page }) {
     const selected = () => page() === props.target;
     return (
@@ -517,18 +563,20 @@ function App() {
           height: 38,
           position: "relative",
           marginBottom: 5,
-          marginHorizontal: 6,
-          paddingHorizontal: expanded() ? 12 : 0,
-          gap: expanded() ? 12 : 0,
+          paddingLeft: 14,
+          paddingRight: 10,
+          gap: expanded() ? 10 : 0,
           flexDirection: "row",
           alignItems: "center",
-          justifyContent: expanded() ? "flex-start" : "center",
+          justifyContent: "flex-start",
           borderRadius: 8,
           backgroundColor: selected() ? hoverColor() : "transparent",
         }}
       >
         {selected() ? <View pointerEvents="none" style={{ position: "absolute", left: 3, top: 11, width: 3, height: 16, borderRadius: 2, backgroundColor: accentColor() }} /> : null}
-        <LucideIcon name={props.icon} size={18} color={selected() ? accentColor() : secondaryColor()} />
+        <View style={{ width: 20, height: 18, alignItems: "center", justifyContent: "center" }}>
+          <LucideIcon name={props.icon} size={18} color={selected() ? accentColor() : secondaryColor()} />
+        </View>
         {expanded() ? <Text style={textStyle(13, selected() ? textColor() : secondaryColor(), selected() ? "600" : "400")}>{props.label}</Text> : null}
       </View>
     );
@@ -885,9 +933,7 @@ function App() {
             <Text style={textStyle(14, textColor())}>{timeLabel(position())} / {timeLabel(duration())}</Text>
           </View>
           <View style={{ width: "10%", alignItems: "center", justifyContent: "center" }}>
-            <View accessibilityLabel={t("Mute", "静音")} onPress={() => { const next = volume() > 0 ? 0 : 0.8; volume.set(next); Music.setVolume(next); void Storage.setItem("zeedle.volume", String(next)); }} hoverStyle={{ backgroundColor: hoverColor() }} activeStyle={{ backgroundColor: pressedColor() }} style={{ width: 28, height: 30, alignItems: "center", justifyContent: "center" }}>
-              <LucideIcon name="volume2" size={20} color={secondaryColor()} />
-            </View>
+            <VolumeControl />
           </View>
         </View>
       </View>
@@ -938,24 +984,18 @@ function App() {
       </View>
 
       <View style={{ flex: 1, minHeight: 0, flexDirection: "row" }}>
-        <View style={{ width: expanded() ? 200 : 54, backgroundColor: panelColor(), borderRightWidth: 1, borderRightColor: lineColor(), paddingTop: 9, paddingBottom: 10 }}>
-          <View testID="sidebar-toggle" onPress={() => {
-            LayoutAnimation.configureNext({
-              duration: 200,
-              update: { type: "easeOut" },
-              create: { type: "easeOut", property: "opacity", duration: 120 },
-              delete: { type: "easeOut", property: "opacity", duration: 120 },
-            });
-            expanded.set(!expanded());
-          }} hoverStyle={{ backgroundColor: hoverColor() }} style={{ height: 36, marginHorizontal: 6, marginBottom: 10, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", justifyContent: expanded() ? "flex-start" : "center", gap: 12, borderRadius: 8 }}>
-            <LucideIcon name={expanded() ? "panelLeftClose" : "panelLeftOpen"} size={18} color={secondaryColor()} />
+        <View style={{ width: expanded() ? 200 : 54, backgroundColor: panelColor(), borderRightWidth: 1, borderRightColor: lineColor(), paddingHorizontal: 6, paddingTop: 9, paddingBottom: 10 }}>
+          <View testID="sidebar-toggle" onPress={() => expanded.set(!expanded())} hoverStyle={{ backgroundColor: hoverColor() }} style={{ height: 36, marginBottom: 10, paddingLeft: 14, paddingRight: 10, flexDirection: "row", alignItems: "center", justifyContent: "flex-start", gap: 10, borderRadius: 8 }}>
+            <View style={{ width: 20, height: 18, alignItems: "center", justifyContent: "center" }}>
+              <LucideIcon name={expanded() ? "panelLeftClose" : "panelLeftOpen"} size={18} color={secondaryColor()} />
+            </View>
           </View>
           <View style={{ height: 5 }} />
           <SideButton icon="listMusic" label={t("Gallery", "曲库")} target={0} />
           <SideButton icon="search" label={t("Search", "搜索")} target={1} />
           <SideButton icon="captions" label={t("Lyrics", "歌词")} target={2} />
           <View style={{ flex: 1 }} />
-          <View style={{ height: 1, backgroundColor: lineColor(), marginHorizontal: 7, marginBottom: 8 }} />
+          <View style={{ height: 1, backgroundColor: lineColor(), marginHorizontal: 1, marginBottom: 8 }} />
           <SideButton icon="settings" label={t("Settings", "设置")} target={3} />
           <SideButton icon="circleHelp" label={t("About", "关于")} target={4} />
         </View>

@@ -25,11 +25,13 @@ use serde::{Deserialize, Serialize};
 mod spectrum;
 #[cfg(windows)]
 mod startup;
+pub mod ui;
 use spectrum::{SpectrumChunk, TapSource, default_spectrum, try_start_spectrum_worker};
 
 #[native_module("zeedle-nsh/native")]
 fn native(registry: &mut Registry) {
     registry.module::<Music>();
+    registry.register::<ui::App>().assets(assets!());
 }
 
 /// Connect the packaged launcher's initially hidden native window.
@@ -336,24 +338,30 @@ fn read_lyrics(path: &Path) -> Vec<LyricItem> {
     lines
 }
 
+fn cover_picture(tag: &Tag) -> Option<&Picture> {
+    tag.pictures()
+        .iter()
+        .find(|picture| picture.pic_type() == PictureType::CoverFront)
+        .or_else(|| {
+            tag.pictures()
+                .iter()
+                .find(|picture| picture.pic_type() == PictureType::CoverBack)
+        })
+        .or_else(|| tag.pictures().first())
+}
+
 fn cover_data_url(path: &Path) -> String {
     let Ok(tagged) = lofty::read_from_path(path) else {
         return String::new();
     };
-    let Some(bytes) = tagged
+    let Some(picture) = tagged
         .primary_tag()
-        .and_then(|tag| {
-            tag.pictures().iter().find(|picture| {
-                matches!(
-                    picture.pic_type(),
-                    PictureType::CoverFront | PictureType::CoverBack
-                )
-            })
-        })
-        .map(|picture| picture.data())
+        .and_then(cover_picture)
+        .or_else(|| tagged.tags().iter().find_map(cover_picture))
     else {
         return String::new();
     };
+    let bytes = picture.data();
     let Ok(image) = image::load_from_memory(bytes) else {
         return String::new();
     };

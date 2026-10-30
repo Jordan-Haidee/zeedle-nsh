@@ -15,7 +15,7 @@
 
 ---
 
-Zeedle is a lightweight desktop music player focused on your local library. This project brings the original Zeedle experience to [Native Shell](https://nsh.dev), with a TSX interface and a Rust audio and metadata backend.
+Zeedle is a lightweight desktop music player focused on your local library. This project brings the original Zeedle experience to [Native Shell](https://nsh.dev), with Rust and TSX interfaces sharing one Rust audio and metadata backend.
 
 ## Features
 
@@ -33,6 +33,8 @@ Install the [NSH CLI](https://nsh.dev/docs/) and a Rust toolchain, then run:
 ```sh
 nsh run
 ```
+
+The app directory starts the Rust UI. Run `nsh run App.tsx` to launch the TSX interface. On Windows, use `nsh run --window-size 885x472` to compare the Rust client area with the TSX window's 900×510 frame.
 
 To check the app and run its tests:
 
@@ -78,7 +80,8 @@ The platform render test captures the library, settings and About screens from e
 
 ## Project structure
 
-- `App.tsx` — screens, navigation and player controls.
+- `src/ui/` — Rust screens, navigation and player controls (the default app root).
+- `App.tsx` — TSX interface, still available with `nsh run App.tsx`.
 - `src/lib.rs` and `src/spectrum.rs` — audio playback, metadata, browser links and spectrum analysis.
 - `assets/icons/` — Lucide SVG interface icons.
 - `theme.json` — light and dark theme tokens.
