@@ -22,9 +22,27 @@ cleanup() {
 trap cleanup EXIT
 
 window_id=
+geometry=
+hints=
 for _ in $(seq 1 150); do
-  window_id=$(xwininfo -root -tree 2>/dev/null | awk '/"Zeedle"/ { print $1; exit }')
+  for candidate in $(xwininfo -root -tree 2>/dev/null | awk '/"Zeedle"/ { print $1 }'); do
+    candidate_geometry=$(xwininfo -id "$candidate" 2>/dev/null) || continue
+    candidate_hints=$(xprop -id "$candidate" WM_NORMAL_HINTS 2>/dev/null) || continue
+    width=$(awk '/^[[:space:]]*Width:/ { print $2; exit }' <<<"$candidate_geometry")
+    height=$(awk '/^[[:space:]]*Height:/ { print $2; exit }' <<<"$candidate_geometry")
+    if grep -Fq "minimum size: 850 by 500" <<<"$candidate_hints" && [[ "$width" == 900 && "$height" == 510 ]]; then
+      window_id=$candidate
+      geometry=$candidate_geometry
+      hints=$candidate_hints
+      break
+    fi
+  done
   [[ -n "$window_id" ]] && break
+  if ! kill -0 "$app_pid" 2>/dev/null; then
+    cat "target/${ui}-window-constraints.log" >&2
+    echo "$ui exited before its native size hints were applied" >&2
+    exit 1
+  fi
   sleep 0.1
 done
 
@@ -34,12 +52,6 @@ if [[ -z "$window_id" ]]; then
   exit 1
 fi
 
-# Let the app's post-titlebar sizing request reach the GTK main loop.
-sleep 0.5
-geometry=$(xwininfo -id "$window_id")
-width=$(awk '/^[[:space:]]*Width:/ { print $2; exit }' <<<"$geometry")
-height=$(awk '/^[[:space:]]*Height:/ { print $2; exit }' <<<"$geometry")
-hints=$(xprop -id "$window_id" WM_NORMAL_HINTS)
 printf '%s: client %sx%s; %s\n' "$ui" "$width" "$height" "$hints"
 
 [[ "$width" == 900 && "$height" == 510 ]] || {
