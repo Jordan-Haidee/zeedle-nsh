@@ -94,9 +94,7 @@ function App() {
     (initialWindowSize.width === 850 && initialWindowSize.height === 500);
   const initialWidth = hostDefaultSize ? 900 : Math.max(initialWindowSize.width, 850);
   const initialHeight = hostDefaultSize ? 510 : Math.max(initialWindowSize.height, 500);
-  if (platform.os === "linux") {
-    Window.setFrame({ size: { width: initialWidth, height: initialHeight } });
-  } else {
+  if (platform.os !== "linux") {
     setTimeout(() => WindowConstraints.configure(initialWidth, initialHeight, 850, 500), 150);
   }
 
