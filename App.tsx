@@ -1,4 +1,4 @@
-import { Image, LayoutAnimation, List, Scroll, Storage, Text as NshText, View, colorScheme, keymap, mount, setColorScheme, signal, split, token, windowSize, type YNode } from "nsh";
+import { Image, LayoutAnimation, List, Scroll, Storage, Text as NshText, View, colorScheme, keymap, mount, platform, setColorScheme, signal, split, token, windowSize, type YNode } from "nsh";
 import { Input } from "nsh/base";
 import { Menu, titleBar, Window } from "nsh/desktop";
 import { Music, WindowConstraints } from "zeedle-nsh/native";
@@ -94,7 +94,11 @@ function App() {
     (initialWindowSize.width === 850 && initialWindowSize.height === 500);
   const initialWidth = hostDefaultSize ? 900 : Math.max(initialWindowSize.width, 850);
   const initialHeight = hostDefaultSize ? 510 : Math.max(initialWindowSize.height, 500);
-  setTimeout(() => WindowConstraints.configure(initialWidth, initialHeight, 850, 500), 150);
+  if (platform.os === "linux") {
+    Window.setFrame({ size: { width: initialWidth, height: initialHeight } });
+  } else {
+    setTimeout(() => WindowConstraints.configure(initialWidth, initialHeight, 850, 500), 150);
+  }
 
   const displayedSongs = () => {
     const items = [...songs()];
@@ -961,7 +965,7 @@ function App() {
   }
 
   return (
-    <View style={{ flex: 1, width: 900, height: 510, minWidth: 850, minHeight: 500, flexDirection: "column", backgroundColor: pageColor(), borderWidth: 1, borderColor: lineColor(), overflow: "hidden" }}>
+    <View style={{ flex: 1, minWidth: 850, minHeight: 500, flexDirection: "column", backgroundColor: pageColor(), borderWidth: 1, borderColor: lineColor(), overflow: "hidden" }}>
       <View
         desktop={{ windowDrag: true }}
         style={{ height: titleBar().height || 40, minHeight: 40, flexDirection: "row", alignItems: "center", paddingLeft: titleBar().left + 10, paddingRight: titleBar().right, backgroundColor: panelColor(), borderBottomWidth: 1, borderBottomColor: lineColor() }}
