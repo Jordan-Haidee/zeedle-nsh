@@ -1,0 +1,116 @@
+export type Language = "en" | "zh" | "es" | "fr" | "de" | "ru";
+
+type AdditionalLanguage = Exclude<Language, "en" | "zh">;
+type Translation = readonly [spanish: string, french: string, german: string, russian: string];
+
+const languageIndex: Record<AdditionalLanguage, number> = {
+  es: 0,
+  fr: 1,
+  de: 2,
+  ru: 3,
+};
+
+const translations: Record<string, Translation> = {
+  "Gallery": ["Biblioteca", "Galerie", "Mediathek", "Библиотека"],
+  "Search": ["Buscar", "Rechercher", "Suche", "Поиск"],
+  "Lyrics": ["Letras", "Paroles", "Songtext", "Тексты песен"],
+  "Settings": ["Ajustes", "Paramètres", "Einstellungen", "Настройки"],
+  "About": ["Acerca de", "À propos", "Über", "О программе"],
+  "Title": ["Título", "Titre", "Titel", "Название"],
+  "Artist": ["Artista", "Artiste", "Künstler", "Исполнитель"],
+  "Unknown": ["Desconocido", "Inconnu", "Unbekannt", "Неизвестно"],
+  "No song": ["Sin canción", "Aucun titre", "Kein Titel", "Нет песни"],
+  "Artist:": ["Artista:", "Artiste :", "Künstler:", "Исполнитель:"],
+  "Title:": ["Título:", "Titre :", "Titel:", "Название:"],
+  "Duration": ["Duración", "Durée", "Dauer", "Длительность"],
+  "Search songs or artists...": [
+    "Buscar canciones o artistas…",
+    "Rechercher des titres ou artistes…",
+    "Titel oder Künstler suchen…",
+    "Поиск песен или исполнителей…",
+  ],
+  "Type to search your music": [
+    "Escribe para buscar música",
+    "Saisissez pour rechercher",
+    "Musik zum Suchen eingeben",
+    "Введите запрос для поиска музыки",
+  ],
+  "No songs found in this folder": [
+    "No hay canciones en esta carpeta",
+    "Aucun titre dans ce dossier",
+    "Keine Titel in diesem Ordner",
+    "В этой папке нет песен",
+  ],
+  "Reading your music library…": [
+    "Leyendo tu biblioteca…",
+    "Lecture de la bibliothèque…",
+    "Musikbibliothek wird gelesen…",
+    "Чтение фонотеки…",
+  ],
+  "Choose a folder with MP3, FLAC, WAV or OGG files": [
+    "Elige una carpeta con archivos MP3, FLAC, WAV u OGG",
+    "Choisissez un dossier contenant des fichiers MP3, FLAC, WAV ou OGG",
+    "Ordner mit MP3-, FLAC-, WAV- oder OGG-Dateien wählen",
+    "Выберите папку с файлами MP3, FLAC, WAV или OGG",
+  ],
+  "Playback": ["Reproducción", "Lecture", "Wiedergabe", "Воспроизведение"],
+  "Music directory": ["Carpeta de música", "Dossier musical", "Musikordner", "Папка с музыкой"],
+  "Browse…": ["Examinar…", "Parcourir…", "Durchsuchen…", "Обзор…"],
+  "Spectrum display": ["Mostrar espectro", "Afficher le spectre", "Spektrum anzeigen", "Показывать спектр"],
+  "Appearance": ["Apariencia", "Apparence", "Darstellung", "Внешний вид"],
+  "Follow system theme": ["Seguir tema del sistema", "Suivre le thème système", "Systemdesign folgen", "Следовать теме системы"],
+  "Language": ["Idioma", "Langue", "Sprache", "Язык"],
+  "result(s) found": ["resultado(s)", "résultat(s)", "Ergebnis(se)", "результат(ов)"],
+  "No song selected": ["Ninguna canción seleccionada", "Aucun titre sélectionné", "Kein Titel ausgewählt", "Песня не выбрана"],
+  "Edit metadata…": ["Editar metadatos…", "Modifier les métadonnées…", "Metadaten bearbeiten…", "Изменить метаданные…"],
+  "Delete song…": ["Eliminar canción…", "Supprimer le titre…", "Titel löschen…", "Удалить песню…"],
+  "Edit song metadata": ["Editar metadatos", "Modifier les métadonnées", "Song-Metadaten bearbeiten", "Изменить метаданные песни"],
+  "Song title": ["Título", "Titre", "Songtitel", "Название песни"],
+  "Album": ["Álbum", "Album", "Album", "Альбом"],
+  "Album cover": ["Portada", "Pochette", "Albumcover", "Обложка альбома"],
+  "Select cover image": ["Elegir portada", "Choisir une pochette", "Coverbild auswählen", "Выбрать обложку"],
+  "Select LRC file": ["Elegir archivo LRC", "Choisir un fichier LRC", "LRC-Datei auswählen", "Выбрать файл LRC"],
+  "Cancel": ["Cancelar", "Annuler", "Abbrechen", "Отмена"],
+  "Save": ["Guardar", "Enregistrer", "Speichern", "Сохранить"],
+  "Delete this song?": ["¿Eliminar esta canción?", "Supprimer ce titre ?", "Diesen Titel löschen?", "Удалить эту песню?"],
+  "Delete song": ["Eliminar canción", "Supprimer le titre", "Titel löschen", "Удалить песню"],
+  "Built by Rodio and NSH": ["Creado con Rodio y NSH", "Créé avec Rodio et NSH", "Erstellt mit Rodio und NSH", "Создано с Rodio и NSH"],
+  "Built by": ["Creado por", "Créé par", "Erstellt von", "Автор сборки"],
+  "and": ["y", "et", "und", "и"],
+  "Music at the speed of a blink, designed for pure simplicity": [
+    "Música al instante, diseñada para la simplicidad",
+    "La musique en un clin d'œil, toute en simplicité",
+    "Musik im Nu, auf pure Einfachheit ausgelegt",
+    "Музыка мгновенно, с акцентом на простоту",
+  ],
+  "Author:": ["Autor:", "Auteur :", "Autor:", "Автор:"],
+  "Version:": ["Versión:", "Version :", "Version:", "Версия:"],
+  "Github": ["Github", "Github", "Github", "Github"],
+  "Embedded lyrics": ["Letras incrustadas", "Paroles intégrées", "Eingebetteter Songtext", "Встроенный текст песни"],
+  "No embedded lyrics": ["No hay letras incrustadas", "Aucune parole intégrée", "Keine eingebetteten Songtexte", "Встроенный текст отсутствует"],
+  "Existing cover will be kept": ["Se conservará la portada actual", "La pochette actuelle sera conservée", "Das vorhandene Cover bleibt erhalten", "Текущая обложка будет сохранена"],
+  "Existing lyrics will be kept": ["Se conservarán las letras actuales", "Les paroles actuelles seront conservées", "Der vorhandene Songtext bleibt erhalten", "Текущий текст будет сохранён"],
+  "Title and artist are required.": ["El título y el artista son obligatorios.", "Le titre et l'artiste sont obligatoires.", "Titel und Künstler sind erforderlich.", "Укажите название и исполнителя."],
+  "The audio file will be removed from your device.": ["El archivo de audio se eliminará del dispositivo.", "Le fichier audio sera supprimé de votre appareil.", "Die Audiodatei wird vom Gerät entfernt.", "Аудиофайл будет удалён с устройства."],
+  "Saving…": ["Guardando…", "Enregistrement…", "Speichern…", "Сохранение…"],
+  "Embedded artwork": ["Portada incrustada", "Pochette intégrée", "Eingebettetes Cover", "Встроенная обложка"],
+  "No cover image": ["Sin imagen de portada", "Aucune image de pochette", "Kein Coverbild", "Нет изображения обложки"],
+  "Could not read that image file.": ["No se pudo leer el archivo de imagen.", "Impossible de lire ce fichier image.", "Bilddatei konnte nicht gelesen werden.", "Не удалось прочитать файл изображения."],
+  "Could not read that LRC file.": ["No se pudo leer el archivo LRC.", "Impossible de lire ce fichier LRC.", "LRC-Datei konnte nicht gelesen werden.", "Не удалось прочитать файл LRC."],
+  "Volume": ["Volumen", "Volume", "Lautstärke", "Громкость"],
+  "Mute": ["Silenciar", "Muet", "Stumm", "Без звука"],
+  "Playback progress": ["Progreso de reproducción", "Progression de lecture", "Wiedergabefortschritt", "Ход воспроизведения"],
+  "Repeat current track": ["Repetir pista actual", "Répéter le titre actuel", "Aktuellen Titel wiederholen", "Повтор текущей песни"],
+  "Previous track": ["Pista anterior", "Titre précédent", "Vorheriger Titel", "Предыдущий трек"],
+  "Play": ["Reproducir", "Lire", "Wiedergabe", "Воспроизвести"],
+  "Pause": ["Pausar", "Pause", "Pause", "Пауза"],
+  "Next track": ["Pista siguiente", "Titre suivant", "Nächster Titel", "Следующий трек"],
+  "Shuffle": ["Aleatorio", "Aléatoire", "Zufallswiedergabe", "Перемешать"],
+  "Toggle theme": ["Cambiar tema", "Changer de thème", "Design umschalten", "Переключить тему"],
+};
+
+export function translate(language: Language, english: string, chinese: string): string {
+  if (language === "zh") return chinese;
+  if (language === "en") return english;
+  return translations[english]?.[languageIndex[language]] ?? english;
+}

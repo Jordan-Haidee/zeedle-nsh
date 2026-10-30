@@ -4,11 +4,11 @@ import { Menu, titleBar, Window } from "nsh/desktop";
 import { Music } from "zeedle-nsh/native";
 import { LucideIcon, type LucideName } from "./icons";
 import cover from "./assets/cover.svg";
+import { translate, type Language } from "./translations";
 
 type Page = 0 | 1 | 2 | 3 | 4;
 type SortField = "song_name" | "singer" | "duration_secs";
 type PlayMode = "order" | "repeat" | "random";
-type Language = "en" | "zh" | "es" | "fr" | "de" | "ru";
 type SongInfo = { id: number; song_name: string; singer: string; duration: string; duration_secs: number; song_path: string };
 type LyricItem = { time: number; duration: number; text: string };
 type PlaybackState = { position: number; duration: number; paused: boolean; volume: number; error: string; spectrum: number[] };
@@ -66,7 +66,7 @@ function App() {
   let lastLyricsScrollOffset: number | null = null;
   let handledEnd = false;
 
-  const t = (english: string, chinese: string) => language() === "zh" ? chinese : english;
+  const t = (english: string, chinese: string) => translate(language(), english, chinese);
   async function openExternalUrl(url: string) {
     const error = await Music.openUrl(url);
     if (error) playerError.set(error);
@@ -367,7 +367,7 @@ function App() {
     const song = editingSong();
     if (!song || editSaving()) return;
     if (!editTitle().trim() || !editArtist().trim()) {
-      editError.set("Title and artist are required.");
+      editError.set(t("Title and artist are required.", "歌曲名和艺术家必填。"));
       return;
     }
     editSaving.set(true);
@@ -685,7 +685,7 @@ function App() {
         </View>
         {search() ? (
           <View style={{ height: 26, justifyContent: "center", paddingHorizontal: 12 }}>
-            <Text style={textStyle(12, mutedColor())}>{language() === "zh" ? `找到 ${searchResults().length} 个结果` : `${searchResults().length} result(s) found`}</Text>
+            <Text style={textStyle(12, mutedColor())}>{language() === "zh" ? `${searchResults().length} ${t("result(s) found", "个结果")}` : `${searchResults().length} ${t("result(s) found", "result(s) found")}`}</Text>
           </View>
         ) : null}
         {search() ? <SongRows items={searchResults()} /> : (
@@ -860,19 +860,19 @@ function App() {
       <View testID="screen-4" style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: pageColor(), gap: 10 }}>
         <Image src={cover} style={{ width: 120, height: 120 }} />
         <Text style={{ ...textStyle(14, textColor()), textAlign: "center" }}>
-          {"Zeedle\nMusic at the speed of a blink, designed for pure simplicity"}
+          {`Zeedle\n${t("Music at the speed of a blink, designed for pure simplicity", "以眨眼般的速度享受音乐，追求纯粹简洁")}`}
         </Text>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }}>
-          <Text style={textStyle(14, textColor())}>Built by</Text>
+          <Text style={textStyle(14, textColor())}>{t("Built by", "构建者")}</Text>
           <View role="link" accessibilityLabel="Rodio" onPress={() => void openExternalUrl("https://github.com/RustAudio/rodio")}>
             <Text style={{ ...textStyle(14, accentColor()), textDecorationLine: "underline" }}>Rodio</Text>
           </View>
-          <Text style={textStyle(14, textColor())}>and</Text>
+          <Text style={textStyle(14, textColor())}>{t("and", "和")}</Text>
           <View testID="about-nsh-link" role="link" accessibilityLabel="NSH" onPress={() => void openExternalUrl("https://nsh.dev")}>
             <Text style={{ ...textStyle(14, accentColor()), textDecorationLine: "underline" }}>NSH</Text>
           </View>
         </View>
-        <Text style={{ ...textStyle(14, textColor()), textAlign: "center" }}>Author: Jordan Haidee{"\n"}Version: 0.1.1</Text>
+        <Text style={{ ...textStyle(14, textColor()), textAlign: "center" }}>{t("Author:", "作者：")} Jordan Haidee{"\n"}{t("Version:", "版本：")} 0.1.1</Text>
         <View role="link" accessibilityLabel="Github" onPress={() => void openExternalUrl("https://github.com/Jordan-Haidee/Zeedle")}>
           <Text style={{ ...textStyle(14, accentColor()), textDecorationLine: "underline" }}>Github</Text>
         </View>
