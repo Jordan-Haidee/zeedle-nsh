@@ -1,7 +1,7 @@
-import { effect, Image, LayoutAnimation, List, Scroll, Storage, Text as NshText, View, colorScheme, keymap, mount, setColorScheme, signal, split, token, windowSize, type YNode } from "nsh";
+import { Image, LayoutAnimation, List, Scroll, Storage, Text as NshText, View, colorScheme, keymap, mount, setColorScheme, signal, split, token, windowSize, type YNode } from "nsh";
 import { Input } from "nsh/base";
 import { Menu, titleBar, Window } from "nsh/desktop";
-import { Music } from "zeedle-nsh/native";
+import { Music, WindowConstraints } from "zeedle-nsh/native";
 import { LucideIcon, type LucideName } from "./icons";
 import cover from "./assets/cover.svg";
 import { translate, type Language } from "./translations";
@@ -85,13 +85,14 @@ function App() {
 
   Window.setTitle("Zeedle");
   Window.setTitleBar("hidden", 40);
-  Window.setFrame({ size: { width: 900, height: 510 } });
-  effect(() => {
-    const size = windowSize();
-    if (size.width > 0 && size.height > 0 && (size.width < 850 || size.height < 500)) {
-      Window.setFrame({ size: { width: Math.max(size.width, 850), height: Math.max(size.height, 500) }, anchorTop: true });
-    }
-  });
+  WindowConstraints.setMinimumSize(850, 500);
+  const initialWindowSize = windowSize();
+  const hostDefaultSize =
+    (initialWindowSize.width === 1200 && initialWindowSize.height === 800) ||
+    (initialWindowSize.width === 390 && initialWindowSize.height === 844);
+  const initialWidth = hostDefaultSize ? 900 : Math.max(initialWindowSize.width, 850);
+  const initialHeight = hostDefaultSize ? 510 : Math.max(initialWindowSize.height, 500);
+  setTimeout(() => WindowConstraints.configure(initialWidth, initialHeight, 850, 500), 150);
 
   const displayedSongs = () => {
     const items = [...songs()];
@@ -432,7 +433,7 @@ function App() {
     Music.setSpectrumEnabled(showSpectrum());
     await refreshSongs(savedDirectory || directory());
   })().catch((error) => playerError.set(String(error))).finally(() => {
-    setTimeout(() => Music.finishStartup?.(), 32);
+    setTimeout(() => Music.finishStartup?.(), 150);
   });
 
   setInterval(() => {

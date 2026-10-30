@@ -51,6 +51,7 @@ jobs:
             libgtk-4-dev \
             libxkbcommon-dev \
             libwebkitgtk-6.0-dev \
+            x11-utils \
             pkg-config \
             xvfb
 
@@ -119,15 +120,25 @@ jobs:
         run: |
           python scripts/with-rust-root.py nsh package --target windows --out .nsh/out/rustui
           python scripts/rust_package_main.py --target windows --install
+          ./scripts/check-windows-window-constraints.ps1 -Ui rustui
           Move-Item .nsh/out/rustui/Zeedle.zip .nsh/out/Zeedle-rustui.zip
+
+      - name: Verify Windows TSX window constraints
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./scripts/check-windows-window-constraints.ps1 -Ui tsxui
+          ./scripts/check-windows-startup.ps1
 
       - name: Package Linux UIs
         if: runner.os == 'Linux'
         shell: bash
         run: |
           xvfb-run -a nsh package --target linux --out .nsh/out/tsxui
+          xvfb-run -a bash scripts/check-linux-window-constraints.sh tsxui
           xvfb-run -a python scripts/with-rust-root.py nsh package --target linux --out .nsh/out/rustui
           python scripts/rust_package_main.py --target linux --install
+          xvfb-run -a bash scripts/check-linux-window-constraints.sh rustui
 
       - name: Package macOS UIs
         if: runner.os == 'macOS'

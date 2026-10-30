@@ -9,7 +9,7 @@ use nsh_platform_windows::windows::Win32::{
     },
     System::Ole::{OleInitialize, OleUninitialize},
     UI::HiDpi::{
-        DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, GetDpiForWindow, SetProcessDpiAwarenessContext,
+        DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, SetProcessDpiAwarenessContext,
     },
     UI::WindowsAndMessaging::{
         ICON_BIG, ICON_SMALL, IMAGE_ICON, LR_LOADFROMFILE, LoadImageW, SendMessageW, WM_SETICON, *,
@@ -136,9 +136,8 @@ unsafe extern "system" fn startup_proc(
                 )
                 .as_bool()
             {
-                let scale = GetDpiForWindow(hwnd).max(96) as f64 / 96.0;
-                let width = (900.0 * scale).round() as i32;
-                let height = (510.0 * scale).round() as i32;
+                let width = rect.right - rect.left;
+                let height = rect.bottom - rect.top;
                 let work = monitor.rcWork;
                 let _ = SetWindowPos(
                     hwnd,

@@ -373,6 +373,19 @@ fn localized(language: &str, text: &str) -> String {
 /// Rust implementation of the Zeedle music player interface.
 #[component]
 pub fn App() -> impl IntoElement {
+    let window_size = nsh_core::element::ambient::window();
+    let host_default_size = (window_size.width.0 == 1200.0 && window_size.height.0 == 800.0)
+        || (window_size.width.0 == 390.0 && window_size.height.0 == 844.0);
+    let initial_width = if host_default_size {
+        900.0
+    } else {
+        window_size.width.0.max(850.0)
+    };
+    let initial_height = if host_default_size {
+        510.0
+    } else {
+        window_size.height.0.max(500.0)
+    };
     let page = signal(0_u8);
     let expanded = signal(false);
     let directory = signal(Music::default_directory());
@@ -474,6 +487,10 @@ pub fn App() -> impl IntoElement {
     };
 
     desktop::set_title_bar(TitleBarStyle::Hidden, Some(px(40.0)));
+    crate::window_constraints::set_minimum_size(850.0, 500.0);
+    nsh_core::element::ambient::set_timeout(Duration::from_millis(150), move || {
+        crate::window_constraints::configure(initial_width, initial_height, 850.0, 500.0);
+    });
     let shortcut_options = KeyOptions {
         when: nsh_core::keymap::When::NotEditing,
         ..Default::default()

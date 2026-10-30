@@ -26,12 +26,31 @@ mod spectrum;
 #[cfg(windows)]
 mod startup;
 pub mod ui;
+mod window_constraints;
 use spectrum::{SpectrumChunk, TapSource, default_spectrum, try_start_spectrum_worker};
 
 #[native_module("zeedle-nsh/native")]
 fn native(registry: &mut Registry) {
     registry.module::<Music>();
+    registry.module::<WindowConstraints>();
     registry.register::<ui::App>().assets(assets!());
+}
+
+/// Set the app window's initial and minimum content sizes on its native host.
+#[module]
+pub struct WindowConstraints;
+
+#[module]
+impl WindowConstraints {
+    /// Enforce the app's native minimum content size during live resizing.
+    pub fn set_minimum_size(min_width: f32, min_height: f32) {
+        window_constraints::set_minimum_size(min_width, min_height);
+    }
+
+    /// Configure the initial and minimum content sizes of the native window.
+    pub fn configure(width: f32, height: f32, min_width: f32, min_height: f32) {
+        window_constraints::configure(width, height, min_width, min_height);
+    }
 }
 
 /// Connect the packaged launcher's initially hidden native window.

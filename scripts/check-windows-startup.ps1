@@ -4,7 +4,10 @@ using System;
 using System.Runtime.InteropServices;
 using System.Drawing;
 public class StartupProbe {
+  [StructLayout(LayoutKind.Sequential)] public struct Point { public int X, Y; }
+  [StructLayout(LayoutKind.Sequential)] public struct MinMaxInfo { public Point Reserved, MaxSize, MaxPosition, MinTrackSize, MaxTrackSize; }
   [DllImport("user32.dll")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+  [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr h);
   [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, uint a, out int value, uint size);
   public static bool Presented(IntPtr h) { int cloak; Rect r; GetWindowRect(h,out r); DwmGetWindowAttribute(h,14,out cloak,4); return IsWindowVisible(h) && cloak == 0 && r.Right > -30000 && r.Bottom > -30000; }
   delegate bool Callback(IntPtr h, IntPtr p);
@@ -12,14 +15,21 @@ public class StartupProbe {
   [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint id);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr h, System.Text.StringBuilder name, int length);
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll", EntryPoint="SendMessageW")] static extern IntPtr SendMessageRaw(IntPtr h, uint m, IntPtr w, IntPtr l);
   [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left, Top, Right, Bottom; }
   [StructLayout(LayoutKind.Sequential)] public struct Info { public int Size; public Rect Monitor, Work; public uint Flags; }
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out Rect r);
+  [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr h, out Rect r);
   [DllImport("user32.dll")] public static extern IntPtr MonitorFromWindow(IntPtr h, uint f);
   [DllImport("user32.dll")] public static extern bool GetMonitorInfo(IntPtr h, ref Info i);
   [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
   [DllImport("user32.dll", EntryPoint="SendMessageW")] static extern IntPtr SendMessageIcon(IntPtr h, uint m, UIntPtr w, IntPtr l);
   public static bool HasIcons(IntPtr h) { return SendMessageIcon(h,127,new UIntPtr(1),IntPtr.Zero)!=IntPtr.Zero && SendMessageIcon(h,127,UIntPtr.Zero,IntPtr.Zero)!=IntPtr.Zero; }
+  public static Point MinimumTrack(IntPtr h) {
+    var info = new MinMaxInfo(); var size=Marshal.SizeOf<MinMaxInfo>(); var memory=Marshal.AllocHGlobal(size);
+    try { Marshal.StructureToPtr(info,memory,false); SendMessageRaw(h,0x0024,IntPtr.Zero,memory); return Marshal.PtrToStructure<MinMaxInfo>(memory).MinTrackSize; }
+    finally { Marshal.FreeHGlobal(memory); }
+  }
   [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr LoadLibraryEx(string file, IntPtr reserved, uint flags);
   [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr FindResource(IntPtr module, IntPtr name, IntPtr type);
   [DllImport("kernel32.dll")] static extern bool FreeLibrary(IntPtr module);
@@ -68,8 +78,16 @@ try {
   [StartupProbe]::Capture($handle, (Join-Path (Get-Location) 'target/windows-packaged-startup.png'))
   $hasIcons = [StartupProbe]::HasIcons($handle)
   $hasEmbeddedIcon = [StartupProbe]::HasEmbeddedIcon((Resolve-Path .nsh/out/Zeedle/Zeedle.exe).Path)
-  [PSCustomObject]@{ HiddenSamples=$hidden; VisibleAfterMs=$timer.ElapsedMilliseconds; CenterErrorX=$dx; CenterErrorY=$dy; TaskbarIcons=$hasIcons; EmbeddedExeIcon=$hasEmbeddedIcon; Width=($rect.Right-$rect.Left); Height=($rect.Bottom-$rect.Top); Left=$rect.Left; Top=$rect.Top; WorkLeft=$info.Work.Left; WorkTop=$info.Work.Top; WorkRight=$info.Work.Right; WorkBottom=$info.Work.Bottom } | Format-List
-  if ($hidden -eq 0 -or $dx -gt 1 -or $dy -gt 1 -or !$hasIcons -or !$hasEmbeddedIcon) { throw 'Startup visibility, centering, or packaged icon check failed' }
+  $track = [StartupProbe]::MinimumTrack($handle)
+  $dpi = [StartupProbe]::GetDpiForWindow($handle)
+  $client = New-Object StartupProbe+Rect
+  [void][StartupProbe]::GetClientRect($handle, [ref]$client)
+  $frameWidth = ($rect.Right-$rect.Left)-($client.Right-$client.Left)
+  $frameHeight = ($rect.Bottom-$rect.Top)-($client.Bottom-$client.Top)
+  $minWidth = [Math]::Round(($track.X-$frameWidth) * 96.0 / $dpi)
+  $minHeight = [Math]::Round(($track.Y-$frameHeight) * 96.0 / $dpi)
+  [PSCustomObject]@{ HiddenSamples=$hidden; VisibleAfterMs=$timer.ElapsedMilliseconds; CenterErrorX=$dx; CenterErrorY=$dy; TaskbarIcons=$hasIcons; EmbeddedExeIcon=$hasEmbeddedIcon; MinimumTrackWidth=$minWidth; MinimumTrackHeight=$minHeight; Width=($rect.Right-$rect.Left); Height=($rect.Bottom-$rect.Top); Left=$rect.Left; Top=$rect.Top; WorkLeft=$info.Work.Left; WorkTop=$info.Work.Top; WorkRight=$info.Work.Right; WorkBottom=$info.Work.Bottom } | Format-List
+  if ($hidden -eq 0 -or $dx -gt 1 -or $dy -gt 1 -or !$hasIcons -or !$hasEmbeddedIcon -or [Math]::Abs($minWidth-850) -gt 1 -or [Math]::Abs($minHeight-500) -gt 1) { throw 'Startup visibility, centering, icons, or minimum-size check failed' }
 } finally {
   if ($handle -ne [IntPtr]::Zero) { [void][StartupProbe]::PostMessage($handle,16,[IntPtr]::Zero,[IntPtr]::Zero) }
   [void]$launched.WaitForExit(5000)
