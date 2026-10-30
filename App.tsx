@@ -961,7 +961,7 @@ function App() {
   }
 
   return (
-    <View style={{ flex: 1, minWidth: 850, minHeight: 500, flexDirection: "column", backgroundColor: pageColor(), borderWidth: 1, borderColor: lineColor(), overflow: "hidden" }}>
+    <View style={{ flex: 1, width: 900, height: 510, minWidth: 850, minHeight: 500, flexDirection: "column", backgroundColor: pageColor(), borderWidth: 1, borderColor: lineColor(), overflow: "hidden" }}>
       <View
         desktop={{ windowDrag: true }}
         style={{ height: titleBar().height || 40, minHeight: 40, flexDirection: "row", alignItems: "center", paddingLeft: titleBar().left + 10, paddingRight: titleBar().right, backgroundColor: panelColor(), borderBottomWidth: 1, borderBottomColor: lineColor() }}
