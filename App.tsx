@@ -709,8 +709,8 @@ function App() {
             <Image src={art()} style={{ width: "100%", height: "100%" }} />
           </View>
           <View style={{ width: albumSize(), marginTop: 5, gap: 3 }}>
-            <Text numberOfLines={1} style={textStyle(14, textColor())}>{t("Artist:", "艺术家：")} {current()?.singer ?? t("Unknown", "未知")}</Text>
-            <Text numberOfLines={1} style={textStyle(14, textColor())}>{t("Title:", "歌曲：")} {current()?.song_name ?? t("No song", "无歌曲")}</Text>
+            <Text numberOfLines={1} style={{ ...textStyle(14, textColor()), textAlign: lyrics().length ? "left" : "center" }}>{t("Artist:", "艺术家：")} {current()?.singer ?? t("Unknown", "未知")}</Text>
+            <Text numberOfLines={1} style={{ ...textStyle(14, textColor()), textAlign: lyrics().length ? "left" : "center" }}>{t("Title:", "歌曲：")} {current()?.song_name ?? t("No song", "无歌曲")}</Text>
           </View>
         </View>
         {lyrics().length ? (

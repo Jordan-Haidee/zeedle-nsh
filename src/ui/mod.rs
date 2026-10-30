@@ -2138,39 +2138,45 @@ fn lyrics_page(app: UiState) -> impl IntoElement {
                         .rounded(px(9.0))
                         .shadow_lg(),
                 )
-                .child(
-                    text(move || {
-                        format!(
-                            "{} {}",
-                            localized(&app.language.get(), "Artist:"),
-                            app.current.get().map_or_else(
-                                || localized(&app.language.get(), "Unknown"),
-                                |song| song.singer
-                            )
+                .child(dynamic(move || {
+                    let label = format!(
+                        "{} {}",
+                        localized(&app.language.get(), "Artist:"),
+                        app.current.get().map_or_else(
+                            || localized(&app.language.get(), "Unknown"),
+                            |song| song.singer
                         )
-                    })
-                    .mt(px(6.0))
-                    .w(move || px((app.lyric_panel_height.get() * 0.4).max(120.0)))
-                    .text_size(px(14.0))
-                    .text_left()
-                    .text_color(move || theme().foreground),
-                )
-                .child(
-                    text(move || {
-                        format!(
-                            "{} {}",
-                            localized(&app.language.get(), "Title:"),
-                            app.current.get().map_or_else(
-                                || localized(&app.language.get(), "No song"),
-                                |song| song.song_name
-                            )
+                    );
+                    let label = text(label)
+                        .mt(px(6.0))
+                        .w(px((app.lyric_panel_height.get() * 0.4).max(120.0)))
+                        .text_size(px(14.0))
+                        .text_color(move || theme().foreground);
+                    if app.lyrics.get().is_empty() {
+                        label.text_center()
+                    } else {
+                        label.text_left()
+                    }
+                }))
+                .child(dynamic(move || {
+                    let label = format!(
+                        "{} {}",
+                        localized(&app.language.get(), "Title:"),
+                        app.current.get().map_or_else(
+                            || localized(&app.language.get(), "No song"),
+                            |song| song.song_name
                         )
-                    })
-                    .w(move || px((app.lyric_panel_height.get() * 0.4).max(120.0)))
-                    .text_size(px(14.0))
-                    .text_left()
-                    .text_color(move || theme().foreground),
-                ),
+                    );
+                    let label = text(label)
+                        .w(px((app.lyric_panel_height.get() * 0.4).max(120.0)))
+                        .text_size(px(14.0))
+                        .text_color(move || theme().foreground);
+                    if app.lyrics.get().is_empty() {
+                        label.text_center()
+                    } else {
+                        label.text_left()
+                    }
+                })),
         )
         .child(
             when(
