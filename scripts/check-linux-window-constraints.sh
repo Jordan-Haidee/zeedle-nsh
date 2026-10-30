@@ -13,7 +13,8 @@ if [[ ! -x "$executable" ]]; then
   exit 1
 fi
 
-"$executable" >"target/${ui}-window-constraints.log" 2>&1 &
+GDK_BACKEND=x11 GTK_A11Y=none GSK_RENDERER=cairo \
+  "$executable" >"target/${ui}-window-constraints.log" 2>&1 &
 app_pid=$!
 cleanup() {
   kill "$app_pid" 2>/dev/null || true
@@ -47,6 +48,9 @@ for _ in $(seq 1 150); do
 done
 
 if [[ -z "$window_id" ]]; then
+  echo "X11 windows after startup:" >&2
+  xwininfo -root -tree >&2 || true
+  ps -o pid,stat,cmd -p "$app_pid" >&2 || true
   cat "target/${ui}-window-constraints.log" >&2
   echo "$ui did not open a visible X11 window" >&2
   exit 1

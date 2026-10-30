@@ -277,7 +277,7 @@ mod linux {
     use nsh_platform_linux::gtk4;
 
     pub(super) fn set_minimum_size(min_width: f32, min_height: f32) {
-        gtk4::glib::MainContext::default().invoke(move || {
+        gtk4::glib::idle_add_once(move || {
             for widget in gtk4::Window::list_toplevels() {
                 if let Ok(window) = widget.downcast::<gtk4::Window>()
                     && window.title().as_deref() == Some("Zeedle")
@@ -289,7 +289,7 @@ mod linux {
     }
 
     pub(super) fn configure(width: f32, height: f32, min_width: f32, min_height: f32) {
-        gtk4::glib::MainContext::default().invoke(move || {
+        gtk4::glib::idle_add_once(move || {
             for widget in gtk4::Window::list_toplevels() {
                 if let Ok(window) = widget.downcast::<gtk4::Window>()
                     && window.title().as_deref() == Some("Zeedle")

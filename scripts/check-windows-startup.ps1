@@ -1,8 +1,6 @@
-Add-Type -AssemblyName System.Drawing
-Add-Type -ReferencedAssemblies System.Drawing -TypeDefinition @'
+Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
-using System.Drawing;
 public class StartupProbe {
   [StructLayout(LayoutKind.Sequential)] public struct Point { public int X, Y; }
   [StructLayout(LayoutKind.Sequential)] public struct MinMaxInfo { public Point Reserved, MaxSize, MaxPosition, MinTrackSize, MaxTrackSize; }
@@ -34,18 +32,10 @@ public class StartupProbe {
   [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr FindResource(IntPtr module, IntPtr name, IntPtr type);
   [DllImport("kernel32.dll")] static extern bool FreeLibrary(IntPtr module);
   public static bool HasEmbeddedIcon(string exe) { var module=LoadLibraryEx(exe,IntPtr.Zero,2); if(module==IntPtr.Zero) return false; try { return FindResource(module,new IntPtr(1),new IntPtr(14))!=IntPtr.Zero; } finally { FreeLibrary(module); } }
-  [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr h, IntPtr dc, uint flags);
   public static IntPtr Find(int id) {
     IntPtr found = IntPtr.Zero;
     EnumWindows(delegate(IntPtr h, IntPtr p) { uint pid; GetWindowThreadProcessId(h, out pid); var name = new System.Text.StringBuilder(128); GetClassName(h,name,128); if (pid == id && name.ToString() == "NshWindow") { found=h; return false; } return true; }, IntPtr.Zero);
     return found;
-  }
-  public static void Capture(IntPtr h, string path) {
-    Rect r; GetWindowRect(h, out r);
-    using(var bmp = new Bitmap(r.Right-r.Left, r.Bottom-r.Top)) using(var g=Graphics.FromImage(bmp)) {
-      var dc=g.GetHdc(); try { PrintWindow(h,dc,2); } finally { g.ReleaseHdc(dc); }
-      bmp.Save(path);
-    }
   }
 }
 '@
@@ -73,9 +63,7 @@ try {
   [void][StartupProbe]::GetMonitorInfo([StartupProbe]::MonitorFromWindow($handle,2), [ref]$info)
   $dx = [Math]::Abs(($rect.Left+$rect.Right)-($info.Work.Left+$info.Work.Right))/2
   $dy = [Math]::Abs(($rect.Top+$rect.Bottom)-($info.Work.Top+$info.Work.Bottom))/2
-  [StartupProbe]::Capture($handle, (Join-Path (Get-Location) 'target/windows-first-visible.png'))
   Start-Sleep -Milliseconds 150
-  [StartupProbe]::Capture($handle, (Join-Path (Get-Location) 'target/windows-packaged-startup.png'))
   $hasIcons = [StartupProbe]::HasIcons($handle)
   $hasEmbeddedIcon = [StartupProbe]::HasEmbeddedIcon((Resolve-Path .nsh/out/Zeedle/Zeedle.exe).Path)
   $track = [StartupProbe]::MinimumTrack($handle)
