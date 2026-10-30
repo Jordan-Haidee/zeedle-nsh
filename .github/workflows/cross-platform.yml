@@ -79,6 +79,9 @@ jobs:
       - name: Check TSX UI
         run: nsh check -v
 
+      - name: Test Rust package startup configuration
+        run: python tests/test_rust_package_main.py
+
       - name: Render TSX UI
         if: runner.os != 'Linux'
         run: nsh test tests/platform-render.test.tsx --target ${{ matrix.target }}
@@ -115,6 +118,7 @@ jobs:
         shell: pwsh
         run: |
           python scripts/with-rust-root.py nsh package --target windows --out .nsh/out/rustui
+          python scripts/rust_package_main.py --target windows --install
           Move-Item .nsh/out/rustui/Zeedle.zip .nsh/out/Zeedle-rustui.zip
 
       - name: Package Linux UIs
@@ -123,6 +127,7 @@ jobs:
         run: |
           xvfb-run -a nsh package --target linux --out .nsh/out/tsxui
           xvfb-run -a python scripts/with-rust-root.py nsh package --target linux --out .nsh/out/rustui
+          python scripts/rust_package_main.py --target linux --install
 
       - name: Package macOS UIs
         if: runner.os == 'macOS'
@@ -130,6 +135,7 @@ jobs:
         run: |
           nsh package --target macos --out .nsh/out/tsxui
           python scripts/with-rust-root.py nsh package --target macos --out .nsh/out/rustui
+          python scripts/rust_package_main.py --target macos --install
 
       - name: Archive macOS TSX UI
         if: runner.os == 'macOS'
