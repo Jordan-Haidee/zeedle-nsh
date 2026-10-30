@@ -89,7 +89,9 @@ function App() {
   const initialWindowSize = windowSize();
   const hostDefaultSize =
     (initialWindowSize.width === 1200 && initialWindowSize.height === 800) ||
-    (initialWindowSize.width === 390 && initialWindowSize.height === 844);
+    (initialWindowSize.width === 390 && initialWindowSize.height === 844) ||
+    // Packaged GTK starts at the app's minimum content size when no host size is set.
+    (initialWindowSize.width === 850 && initialWindowSize.height === 500);
   const initialWidth = hostDefaultSize ? 900 : Math.max(initialWindowSize.width, 850);
   const initialHeight = hostDefaultSize ? 510 : Math.max(initialWindowSize.height, 500);
   setTimeout(() => WindowConstraints.configure(initialWidth, initialHeight, 850, 500), 150);
