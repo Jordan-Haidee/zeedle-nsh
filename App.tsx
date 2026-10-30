@@ -1,4 +1,4 @@
-import { Image, List, Scroll, Storage, Text, View, colorScheme, keymap, mount, setColorScheme, signal, token, type YNode } from "nsh";
+import { Image, LayoutAnimation, List, Scroll, Storage, Text, View, colorScheme, keymap, mount, setColorScheme, signal, token, type YNode } from "nsh";
 import { Input } from "nsh/base";
 import { Menu, titleBar, Window } from "nsh/desktop";
 import { Music } from "zeedle-nsh/native";
@@ -985,7 +985,15 @@ function App() {
 
       <View style={{ flex: 1, minHeight: 0, flexDirection: "row" }}>
         <View style={{ width: expanded() ? 200 : 54, backgroundColor: panelColor(), borderRightWidth: 1, borderRightColor: lineColor(), paddingHorizontal: 6, paddingTop: 9, paddingBottom: 10 }}>
-          <View testID="sidebar-toggle" onPress={() => expanded.set(!expanded())} hoverStyle={{ backgroundColor: hoverColor() }} style={{ height: 36, marginBottom: 10, paddingLeft: 14, paddingRight: 10, flexDirection: "row", alignItems: "center", justifyContent: "flex-start", gap: 10, borderRadius: 8 }}>
+          <View testID="sidebar-toggle" onPress={() => {
+            LayoutAnimation.configureNext({
+              duration: 200,
+              update: { type: "easeOut" },
+              create: { type: "easeOut", property: "opacity", duration: 120 },
+              delete: { type: "easeOut", property: "opacity", duration: 120 },
+            });
+            expanded.set(!expanded());
+          }} hoverStyle={{ backgroundColor: hoverColor() }} style={{ height: 36, marginBottom: 10, paddingLeft: 14, paddingRight: 10, flexDirection: "row", alignItems: "center", justifyContent: "flex-start", gap: 10, borderRadius: 8 }}>
             <View style={{ width: 20, height: 18, alignItems: "center", justifyContent: "center" }}>
               <LucideIcon name={expanded() ? "panelLeftClose" : "panelLeftOpen"} size={18} color={secondaryColor()} />
             </View>

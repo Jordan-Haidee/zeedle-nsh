@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use nsh_base::{input, theme};
 use nsh_core::{
+    LayoutAnimation, LayoutCurve, LayoutTransition,
     desktop::TitleBarStyle,
     element::{IntoElement, desktop},
     platform::Appearance,
@@ -822,7 +823,23 @@ pub fn App() -> impl IntoElement {
                                 .rounded(px(8.0))
                                 .label("Toggle navigation")
                                 .hover(|style| style.bg(move || color_token("hover")))
-                                .on_press(move || expanded.set(!expanded.get()))
+                                .on_press(move || {
+                                    animate_layout(LayoutAnimation {
+                                        create: Some(LayoutTransition::new(
+                                            LayoutCurve::EaseOut,
+                                            120.0,
+                                        )),
+                                        update: Some(LayoutTransition::new(
+                                            LayoutCurve::EaseOut,
+                                            200.0,
+                                        )),
+                                        delete: Some(LayoutTransition::new(
+                                            LayoutCurve::EaseOut,
+                                            120.0,
+                                        )),
+                                    });
+                                    expanded.set(!expanded.get());
+                                })
                                 .child(
                                     view()
                                         .w(px(20.0))
@@ -1744,7 +1761,121 @@ fn delete_overlay(app: UiState, refresh: impl Fn(String) + Copy + 'static) -> im
         )
 }
 
+fn song_row(app: UiState, song: SongInfo) -> impl IntoElement {
+    let song_path = song.song_path.clone();
+    let active = computed(move || {
+        app.current
+            .get()
+            .is_some_and(|current| current.song_path == song_path)
+    });
+    let click_song = song.clone();
+    let action_song = song.clone();
+    let context_song = song.clone();
+    let title = song.song_name.clone();
+    view()
+        .test_id(&format!("song-row-{}", song.id))
+        .h(px(30.0))
+        .flex_row()
+        .items_center()
+        .justify_between()
+        .hover(|style| style.bg(move || color_token("song-hover")))
+        .bg(move || {
+            if active.get() {
+                color_token("hover")
+            } else {
+                color_token("page")
+            }
+        })
+        .on(EventKind::Press, move |payload: &EventPayload| {
+            if let EventPayload::Press(press) = payload
+                && press.clicks > 1
+            {
+                play_track(click_song.clone(), true, app);
+            }
+        })
+        .on_long_press(move || app.selected_action.set(Some(action_song.clone())))
+        .on(EventKind::ContextMenu, move |payload: &EventPayload| {
+            if let EventPayload::ContextMenu(event) = payload {
+                app.action_position.set(event.page_position);
+                app.selected_action.set(Some(context_song.clone()));
+            }
+        })
+        .child(view().w(percentage(0.33)).child(dynamic(move || {
+            if active.get() {
+                text(title.clone())
+                    .ml(percentage(0.4))
+                    .text_size(px(14.0))
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(theme().primary)
+            } else {
+                text(title.clone())
+                    .ml(percentage(0.4))
+                    .text_size(px(14.0))
+                    .font_weight(FontWeight::NORMAL)
+                    .text_color(theme().foreground)
+            }
+        })))
+        .child(
+            view().w(percentage(0.33)).child(
+                text(song.singer.clone())
+                    .ml(percentage(0.4))
+                    .text_size(px(14.0))
+                    .text_color(move || {
+                        if active.get() {
+                            theme().primary
+                        } else {
+                            theme().foreground
+                        }
+                    }),
+            ),
+        )
+        .child(
+            view().w(percentage(0.33)).child(
+                text(song.duration.clone())
+                    .ml(percentage(0.4))
+                    .text_size(px(14.0))
+                    .text_color(move || {
+                        if active.get() {
+                            theme().primary
+                        } else {
+                            theme().foreground
+                        }
+                    }),
+            ),
+        )
+}
+
+fn song_list(app: UiState, songs: Memo<Vec<SongInfo>>) -> impl IntoElement {
+    virtual_list(
+        move || songs.with(|songs| songs.len()),
+        move |position| {
+            dynamic(move || {
+                songs
+                    .with(|songs| songs.get(position.index()).cloned())
+                    .map_or_else(
+                        || view().into_element(),
+                        |song| song_row(app, song).into_element(),
+                    )
+            })
+        },
+    )
+    .keys(move || {
+        songs.with(|songs| {
+            songs
+                .iter()
+                .map(|song| song.song_path.clone())
+                .collect::<Vec<_>>()
+        })
+    })
+    .estimated_item_size(px(30.0))
+    .flex_1()
+    .min_h(px(0.0))
+}
+
 fn library_page(app: UiState) -> impl IntoElement {
+    let songs = computed(move || {
+        sorted_songs(&app.songs.get(), &app.sort_field.get(), app.ascending.get())
+    });
     let sort_header = move |label: &'static str, field: &'static str| {
         view()
             .w(percentage(0.33))
@@ -1795,158 +1926,60 @@ fn library_page(app: UiState) -> impl IntoElement {
                 .child(sort_header("Duration", "duration_secs")),
         )
         .child(
-            scroll().flex_1().min_h(px(0.0)).child(
-                view()
-                    .flex_col()
-                    .child(each(
+            view()
+                .flex_1()
+                .min_h(px(0.0))
+                .relative()
+                .flex_col()
+                .child(song_list(app, songs))
+                .child(
+                    when(
+                        move || app.loading.get() || songs.with(|songs| songs.is_empty()),
                         move || {
-                            sorted_songs(
-                                &app.songs.get(),
-                                &app.sort_field.get(),
-                                app.ascending.get(),
-                            )
-                        },
-                        |song: &SongInfo| song.song_path.clone(),
-                        move |song: ReadSignal<SongInfo>, _index: ReadSignal<usize>| {
-                            let song = song.get();
-                            let song_path = song.song_path.clone();
-                            let active = computed(move || {
-                                app.current
-                                    .get()
-                                    .is_some_and(|current| current.song_path == song_path)
-                            });
-                            let click_song = song.clone();
-                            let action_song = song.clone();
-                            let context_song = song.clone();
-                            let title = song.song_name.clone();
                             view()
-                                .test_id(&format!("song-row-{}", song.id))
-                                .h(px(30.0))
-                                .flex_row()
+                                .absolute()
+                                .left(px(0.0))
+                                .right(px(0.0))
+                                .top(px(0.0))
+                                .bottom(px(0.0))
+                                .flex_col()
                                 .items_center()
-                                .justify_between()
-                                .hover(|style| style.bg(move || color_token("song-hover")))
-                                .bg(move || {
-                                    if active.get() {
-                                        color_token("hover")
-                                    } else {
-                                        color_token("page")
-                                    }
-                                })
-                                .on(EventKind::Press, move |payload: &EventPayload| {
-                                    if let EventPayload::Press(press) = payload
-                                        && press.clicks > 1
-                                    {
-                                        play_track(click_song.clone(), true, app);
-                                    }
-                                })
-                                .on_long_press(move || {
-                                    app.selected_action.set(Some(action_song.clone()))
-                                })
-                                .on(EventKind::ContextMenu, move |payload: &EventPayload| {
-                                    if let EventPayload::ContextMenu(event) = payload {
-                                        app.action_position.set(event.page_position);
-                                        app.selected_action.set(Some(context_song.clone()));
-                                    }
-                                })
-                                .child(view().w(percentage(0.33)).child(dynamic(move || {
-                                    if active.get() {
-                                        text(title.clone())
-                                            .ml(percentage(0.4))
-                                            .text_size(px(14.0))
-                                            .font_weight(FontWeight::SEMIBOLD)
-                                            .text_color(theme().primary)
-                                    } else {
-                                        text(title.clone())
-                                            .ml(percentage(0.4))
-                                            .text_size(px(14.0))
-                                            .font_weight(FontWeight::NORMAL)
-                                            .text_color(theme().foreground)
-                                    }
-                                })))
+                                .justify_center()
+                                .gap(px(8.0))
+                                .child(svg_icon("search", 24.0, "text-tertiary"))
                                 .child(
-                                    view().w(percentage(0.33)).child(
-                                        text(song.singer.clone())
-                                            .ml(percentage(0.4))
-                                            .text_size(px(14.0))
-                                            .text_color(move || {
-                                                if active.get() {
-                                                    theme().primary
-                                                } else {
-                                                    theme().foreground
-                                                }
-                                            }),
-                                    ),
+                                    text(move || {
+                                        localized(
+                                            &app.language.get(),
+                                            if app.loading.get() {
+                                                "Reading your music library…"
+                                            } else {
+                                                "No songs found in this folder"
+                                            },
+                                        )
+                                    })
+                                    .text_size(px(13.0))
+                                    .text_color(move || color_token("text-tertiary")),
                                 )
                                 .child(
-                                    view().w(percentage(0.33)).child(
-                                        text(song.duration.clone())
-                                            .ml(percentage(0.4))
-                                            .text_size(px(14.0))
-                                            .text_color(move || {
-                                                if active.get() {
-                                                    theme().primary
-                                                } else {
-                                                    theme().foreground
-                                                }
-                                            }),
-                                    ),
+                                    text(move || {
+                                        localized(
+                                            &app.language.get(),
+                                            "Choose a folder with MP3, FLAC, WAV or OGG files",
+                                        )
+                                    })
+                                    .text_size(px(12.0))
+                                    .text_color(move || color_token("text-tertiary")),
                                 )
                         },
-                    ))
-                    .child(
-                        when(
-                            move || {
-                                app.loading.get()
-                                    || sorted_songs(
-                                        &app.songs.get(),
-                                        &app.sort_field.get(),
-                                        app.ascending.get(),
-                                    )
-                                    .is_empty()
-                            },
-                            move || {
-                                view()
-                                    .h(px(220.0))
-                                    .min_h(px(220.0))
-                                    .flex_col()
-                                    .items_center()
-                                    .justify_center()
-                                    .gap(px(8.0))
-                                    .child(svg_icon("search", 24.0, "text-tertiary"))
-                                    .child(
-                                        text(move || {
-                                            localized(
-                                                &app.language.get(),
-                                                if app.loading.get() {
-                                                    "Reading your music library…"
-                                                } else {
-                                                    "No songs found in this folder"
-                                                },
-                                            )
-                                        })
-                                        .text_size(px(13.0))
-                                        .text_color(move || color_token("text-tertiary")),
-                                    )
-                                    .child(
-                                        text(move || {
-                                            localized(
-                                                &app.language.get(),
-                                                "Choose a folder with MP3, FLAC, WAV or OGG files",
-                                            )
-                                        })
-                                        .text_size(px(12.0))
-                                        .text_color(move || color_token("text-tertiary")),
-                                    )
-                            },
-                        )
-                        .otherwise(|| view()),
-                    ),
-            ),
+                    )
+                    .otherwise(|| view()),
+                ),
         )
 }
 
 fn search_page(app: UiState) -> impl IntoElement {
+    let results = computed(move || app.search_results.get());
     let update_query = move |value: &str| {
         app.query.set(value.to_string());
         app.search_results
@@ -2027,121 +2060,38 @@ fn search_page(app: UiState) -> impl IntoElement {
             when(
                 move || !app.query.get().is_empty(),
                 move || {
-                    view().flex_1().child(
-                        when(
-                            move || app.search_results.get().is_empty(),
-                            move || {
-                                view().flex_1().items_center().justify_center().child(
-                                    text(move || {
-                                        localized(
-                                            &app.language.get(),
-                                            "No songs found in this folder",
-                                        )
-                                    })
-                                    .text_size(px(13.0))
-                                    .text_color(move || color_token("text-tertiary")),
-                                )
-                            },
-                        )
-                        .otherwise(move || {
-                            each(
-                                move || app.search_results.get(),
-                                |song: &SongInfo| song.song_path.clone(),
-                                move |song: ReadSignal<SongInfo>, _index: ReadSignal<usize>| {
-                                    let song = song.get();
-                                    let song_path = song.song_path.clone();
-                                    let active = computed(move || {
-                                        app.current
-                                            .get()
-                                            .is_some_and(|current| current.song_path == song_path)
-                                    });
-                                    let click_song = song.clone();
-                                    let action_song = song.clone();
-                                    let context_song = song.clone();
-                                    let title = song.song_name.clone();
+                    view()
+                        .flex_1()
+                        .min_h(px(0.0))
+                        .relative()
+                        .flex_col()
+                        .child(song_list(app, results))
+                        .child(
+                            when(
+                                move || results.with(|songs| songs.is_empty()),
+                                move || {
                                     view()
-                                        .test_id(&format!("song-row-{}", song.id))
-                                        .h(px(30.0))
-                                        .flex_row()
+                                        .absolute()
+                                        .left(px(0.0))
+                                        .right(px(0.0))
+                                        .top(px(0.0))
+                                        .bottom(px(0.0))
                                         .items_center()
-                                        .justify_between()
-                                        .hover(|style| style.bg(move || color_token("song-hover")))
-                                        .bg(move || {
-                                            if active.get() {
-                                                color_token("hover")
-                                            } else {
-                                                color_token("page")
-                                            }
-                                        })
-                                        .on(EventKind::Press, move |payload: &EventPayload| {
-                                            if let EventPayload::Press(press) = payload
-                                                && press.clicks > 1
-                                            {
-                                                play_track(click_song.clone(), true, app);
-                                            }
-                                        })
-                                        .on_long_press(move || {
-                                            app.selected_action.set(Some(action_song.clone()))
-                                        })
-                                        .on(
-                                            EventKind::ContextMenu,
-                                            move |payload: &EventPayload| {
-                                                if let EventPayload::ContextMenu(event) = payload {
-                                                    app.action_position.set(event.page_position);
-                                                    app.selected_action
-                                                        .set(Some(context_song.clone()));
-                                                }
-                                            },
-                                        )
-                                        .child(view().w(percentage(0.33)).child(dynamic(
-                                            move || {
-                                                if active.get() {
-                                                    text(title.clone())
-                                                        .ml(percentage(0.4))
-                                                        .text_size(px(14.0))
-                                                        .font_weight(FontWeight::SEMIBOLD)
-                                                        .text_color(theme().primary)
-                                                } else {
-                                                    text(title.clone())
-                                                        .ml(percentage(0.4))
-                                                        .text_size(px(14.0))
-                                                        .font_weight(FontWeight::NORMAL)
-                                                        .text_color(theme().foreground)
-                                                }
-                                            },
-                                        )))
+                                        .justify_center()
                                         .child(
-                                            view().w(percentage(0.33)).child(
-                                                text(song.singer.clone())
-                                                    .ml(percentage(0.4))
-                                                    .text_size(px(14.0))
-                                                    .text_color(move || {
-                                                        if active.get() {
-                                                            theme().primary
-                                                        } else {
-                                                            theme().foreground
-                                                        }
-                                                    }),
-                                            ),
-                                        )
-                                        .child(
-                                            view().w(percentage(0.33)).child(
-                                                text(song.duration.clone())
-                                                    .ml(percentage(0.4))
-                                                    .text_size(px(14.0))
-                                                    .text_color(move || {
-                                                        if active.get() {
-                                                            theme().primary
-                                                        } else {
-                                                            theme().foreground
-                                                        }
-                                                    }),
-                                            ),
+                                            text(move || {
+                                                localized(
+                                                    &app.language.get(),
+                                                    "No songs found in this folder",
+                                                )
+                                            })
+                                            .text_size(px(13.0))
+                                            .text_color(move || color_token("text-tertiary")),
                                         )
                                 },
                             )
-                        }),
-                    )
+                            .otherwise(|| view()),
+                        )
                 },
             )
             .otherwise(move || {
