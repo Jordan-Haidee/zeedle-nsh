@@ -34,7 +34,7 @@ Install the [NSH CLI](https://nsh.dev/docs/) and a Rust toolchain, then run:
 nsh run
 ```
 
-The app directory starts the Rust UI. Run `nsh run App.tsx` to launch the TSX interface. On Windows, use `nsh run --window-size 885x472` to compare the Rust client area with the TSX window's 900×510 frame.
+The app directory starts the TSX UI in `App.tsx` by default. On Windows, use `nsh run --window-size 900x510` to set the initial window size.
 
 To check the app and run its tests:
 
@@ -80,8 +80,8 @@ The platform render test captures the library, settings and About screens from e
 
 ## Project structure
 
-- `src/ui/` — Rust screens, navigation and player controls (the default app root).
-- `App.tsx` — TSX interface, still available with `nsh run App.tsx`.
+- `src/ui/` — Rust screens, navigation and player controls.
+- `App.tsx` — TSX interface and the default entry for `nsh run`.
 - `src/lib.rs` and `src/spectrum.rs` — audio playback, metadata, browser links and spectrum analysis.
 - `assets/icons/` — Lucide SVG interface icons.
 - `theme.json` — light and dark theme tokens.
