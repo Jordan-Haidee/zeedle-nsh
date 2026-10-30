@@ -17,6 +17,26 @@ class RustPackageMainTests(unittest.TestCase):
                 self.assertIn("size: (900, 510)", result.stdout)
                 self.assertIn("AppSource::Rust", result.stdout)
 
+    def test_linux_tsx_runner_sets_window_size_before_loading_the_bundle(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "scripts/rust_package_main.py",
+                "--target",
+                "linux",
+                "--ui",
+                "tsxui",
+                "--print-source",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("size: (900, 510)", result.stdout)
+        self.assertIn("AppSource::Bundle", result.stdout)
+        self.assertIn("Bundle::read_trusted", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

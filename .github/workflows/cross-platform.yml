@@ -135,6 +135,7 @@ jobs:
         shell: bash
         run: |
           xvfb-run -a nsh package --target linux --out .nsh/out/tsxui
+          python scripts/rust_package_main.py --target linux --ui tsxui --install
           xvfb-run -a bash scripts/check-linux-window-constraints.sh tsxui
           xvfb-run -a python scripts/with-rust-root.py nsh package --target linux --out .nsh/out/rustui
           python scripts/rust_package_main.py --target linux --install

@@ -152,6 +152,7 @@ jobs:
             archive=".nsh/out/rustui/Zeedle.tar.gz"
           else
             xvfb-run -a nsh package --target linux --out .nsh/out/tsxui
+            python scripts/rust_package_main.py --target linux --ui tsxui --install
             xvfb-run -a bash scripts/check-linux-window-constraints.sh tsxui
             archive=".nsh/out/tsxui/Zeedle.tar.gz"
           fi
