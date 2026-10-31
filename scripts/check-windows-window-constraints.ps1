@@ -38,7 +38,23 @@ public static class NativeWindowConstraintsProbe {
   [DllImport("user32.dll")] public static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
   [DllImport("user32.dll", EntryPoint = "GetMonitorInfoW")] public static extern bool GetMonitorInfo(IntPtr monitor, ref WindowMonitorInfo info);
   [DllImport("user32.dll", EntryPoint = "SendMessageW")] static extern IntPtr SendMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
+  [DllImport("user32.dll", EntryPoint = "SendMessageW")] static extern IntPtr SendIconMessage(IntPtr hwnd, uint message, UIntPtr wParam, IntPtr lParam);
   [DllImport("user32.dll")] public static extern bool PostMessageW(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
+  [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern IntPtr LoadLibraryExW(string file, IntPtr reserved, uint flags);
+  [DllImport("kernel32.dll", EntryPoint = "FindResourceW", CharSet = CharSet.Unicode, SetLastError = true)] static extern IntPtr FindResource(IntPtr module, IntPtr name, IntPtr type);
+  [DllImport("kernel32.dll")] static extern bool FreeLibrary(IntPtr module);
+
+  public static bool HasWindowIcons(IntPtr hwnd) {
+    return SendIconMessage(hwnd, 0x007F, new UIntPtr(1), IntPtr.Zero) != IntPtr.Zero
+      && SendIconMessage(hwnd, 0x007F, UIntPtr.Zero, IntPtr.Zero) != IntPtr.Zero;
+  }
+
+  public static bool HasEmbeddedIcon(string file) {
+    var module = LoadLibraryExW(file, IntPtr.Zero, 2); // LOAD_LIBRARY_AS_DATAFILE
+    if (module == IntPtr.Zero) return false;
+    try { return FindResource(module, new IntPtr(1), new IntPtr(14)) != IntPtr.Zero; }
+    finally { FreeLibrary(module); }
+  }
 
   public static IntPtr FindWindow(int processId) {
     IntPtr found = IntPtr.Zero;
@@ -119,6 +135,12 @@ try {
   }
   if ($startupGeometryChanged) {
     throw "$Ui window moved or resized after its first visible frame"
+  }
+  $hasWindowIcons = [NativeWindowConstraintsProbe]::HasWindowIcons($window)
+  $hasEmbeddedIcon = [NativeWindowConstraintsProbe]::HasEmbeddedIcon((Resolve-Path -LiteralPath $executable).Path)
+  Write-Output "${Ui}: window icons $hasWindowIcons, embedded executable icon $hasEmbeddedIcon"
+  if (!$hasWindowIcons -or !$hasEmbeddedIcon) {
+    throw "$Ui must expose large/small taskbar icons and embed an executable icon"
   }
   if ([Math]::Abs($clientWidth - 900) -gt 1 -or [Math]::Abs($clientHeight - 510) -gt 1) {
     throw "$Ui startup client size should be 900x510 points"

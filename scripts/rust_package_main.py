@@ -58,6 +58,14 @@ fn main() -> std::process::ExitCode {{
 '''
 
 
+def stage_windows_icons(repo_root: Path, app_source: Path, package_app: Path) -> None:
+    shutil.copy2(repo_root / "scripts" / "windows-build.rs", app_source / "build.rs")
+    shutil.copy2(repo_root / "assets" / "cover.ico", app_source / "cover.ico")
+    runtime_icon = package_app / "nsh" / "assets" / "assets" / "cover.ico"
+    runtime_icon.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(repo_root / "assets" / "cover.ico", runtime_icon)
+
+
 def tsx_main_source() -> str:
     return '''#![cfg(target_os = "linux")]
 
@@ -115,6 +123,18 @@ def install(target: str, ui: str = "rustui") -> None:
             cargo_toml = cargo_toml.rstrip() + "\n\n[build-dependencies]\nwinresource = '=0.1.23'\n"
     manifest.write_text(cargo_toml, encoding="utf-8", newline="\n")
 
+    package = Path(".nsh/out") / ui
+    if target == "windows":
+        app = package / "Zeedle"
+        destination = app / "Zeedle.exe"
+        stage_windows_icons(Path.cwd(), app_source, app)
+    elif target == "linux":
+        app = package / "Zeedle"
+        destination = app / "Zeedle"
+    else:
+        app = package / "Zeedle.app"
+        destination = app / "Contents/MacOS/Zeedle"
+
     package_name = re.search(r'^name\s*=\s*"([^"]+)"', manifest.read_text(encoding="utf-8"), re.M)
     if package_name is None:
         raise RuntimeError(f"No Cargo package name in {manifest}")
@@ -129,16 +149,6 @@ def install(target: str, ui: str = "rustui") -> None:
     if result.returncode:
         raise SystemExit(result.returncode)
 
-    package = Path(".nsh/out") / ui
-    if target == "windows":
-        app = package / "Zeedle"
-        destination = app / "Zeedle.exe"
-    elif target == "linux":
-        app = package / "Zeedle"
-        destination = app / "Zeedle"
-    else:
-        app = package / "Zeedle.app"
-        destination = app / "Contents/MacOS/Zeedle"
     shutil.copy2(binary, destination)
 
     if target == "windows":
