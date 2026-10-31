@@ -1,4 +1,8 @@
-use std::time::Duration;
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    time::Duration,
+};
 
 use nsh_base::{input, theme};
 use nsh_core::{
@@ -11,6 +15,7 @@ use nsh_core::{
 };
 
 use crate::Music;
+use crate::config::{Config, LEGACY_STORAGE_KEYS, PlayMode as ConfigPlayMode, SortKey};
 
 mod model;
 use model::{LyricItem, PlaybackState, SongInfo, search_songs, sorted_songs, time_label};
@@ -58,6 +63,8 @@ struct UiState {
     edit_saving: Signal<bool>,
     delete_target: Signal<Option<SongInfo>>,
     lyric_scroll: ElementRef,
+    gallery_scroll: ElementRef,
+    gallery_viewport_y: Signal<f32>,
     last_lyric_index: Signal<i32>,
     manual_lyrics_until: Signal<u64>,
     ignore_programmatic_scroll_until: Signal<u64>,
@@ -66,6 +73,74 @@ struct UiState {
 }
 
 const COVER: nsh_core::element::FileAsset = asset!("cover.svg");
+
+fn play_mode_from_config(mode: ConfigPlayMode) -> &'static str {
+    match mode {
+        ConfigPlayMode::Recursive => "repeat",
+        ConfigPlayMode::Random => "random",
+        ConfigPlayMode::InOrder => "order",
+    }
+}
+
+fn play_mode_to_config(mode: &str) -> ConfigPlayMode {
+    match mode {
+        "repeat" => ConfigPlayMode::Recursive,
+        "random" => ConfigPlayMode::Random,
+        _ => ConfigPlayMode::InOrder,
+    }
+}
+
+fn sort_key_from_config(sort_key: SortKey) -> &'static str {
+    match sort_key {
+        SortKey::BySinger => "singer",
+        SortKey::ByDuration => "duration_secs",
+        SortKey::BySongName => "song_name",
+    }
+}
+
+fn sort_key_to_config(sort_key: &str) -> SortKey {
+    match sort_key {
+        "singer" => SortKey::BySinger,
+        "duration_secs" => SortKey::ByDuration,
+        _ => SortKey::BySongName,
+    }
+}
+
+fn same_song_path(left: &str, right: &str) -> bool {
+    left.replace('\\', "/") == right.replace('\\', "/")
+}
+
+fn save_config_snapshot(app: UiState, expanded: Signal<bool>) {
+    let playback = serde_json::from_str::<PlaybackState>(&Music::state()).ok();
+    let config = Config {
+        song_dir: std::path::PathBuf::from(app.directory.get()),
+        current_song_path: app
+            .current
+            .get()
+            .map(|song| std::path::PathBuf::from(song.song_path)),
+        progress: app.position.get(),
+        play_mode: play_mode_to_config(&app.mode.get()),
+        sort_key: sort_key_to_config(&app.sort_field.get()),
+        sort_ascending: app.ascending.get(),
+        lang: if app.language.get() == "en" {
+            String::new()
+        } else {
+            app.language.get()
+        },
+        light_ui: app.light.get(),
+        follow_system_theme: app.follow_system.get(),
+        volume: playback
+            .as_ref()
+            .map_or(app.volume.get(), |state| state.volume),
+        show_spectrum: app.show_spectrum.get(),
+        current_page: i32::from(app.page.get()),
+        sidebar_expanded: expanded.get(),
+        gallery_viewport_y: app.gallery_viewport_y.get(),
+    };
+    if let Err(error) = config.save() {
+        log::error!("failed to save config: {error}");
+    }
+}
 
 fn text(content: impl IntoReactive<SharedString>) -> Text {
     nsh_core::element::text(content)
@@ -373,6 +448,7 @@ fn localized(language: &str, text: &str) -> String {
 /// Rust implementation of the Zeedle music player interface.
 #[component]
 pub fn App() -> impl IntoElement {
+    let config = Config::load();
     let window_size = nsh_core::element::ambient::window();
     let host_default_size = (window_size.width.0 == 1200.0 && window_size.height.0 == 800.0)
         || (window_size.width.0 == 390.0 && window_size.height.0 == 844.0);
@@ -386,9 +462,9 @@ pub fn App() -> impl IntoElement {
     } else {
         window_size.height.0.max(500.0)
     };
-    let page = signal(0_u8);
-    let expanded = signal(false);
-    let directory = signal(Music::default_directory());
+    let page = signal(config.current_page.clamp(0, 4) as u8);
+    let expanded = signal(config.sidebar_expanded);
+    let directory = signal(config.song_dir.to_string_lossy().into_owned());
     let songs = signal(Vec::<SongInfo>::new());
     let current = signal(None::<SongInfo>);
     let lyrics = signal(Vec::<LyricItem>::new());
@@ -397,22 +473,26 @@ pub fn App() -> impl IntoElement {
     let search_results = signal(Vec::<SongInfo>::new());
     let loading = signal(true);
     let startup_pending = signal(true);
-    let sort_field = signal(String::from("song_name"));
-    let ascending = signal(true);
-    let mode = signal(String::from("order"));
-    let position = signal(0.0_f32);
+    let sort_field = signal(sort_key_from_config(config.sort_key).to_owned());
+    let ascending = signal(config.sort_ascending);
+    let mode = signal(play_mode_from_config(config.play_mode).to_owned());
+    let position = signal(config.progress);
     let duration = signal(0.0_f32);
     let paused = signal(true);
-    let volume = signal(0.8_f32);
-    let show_spectrum = signal(true);
+    let volume = signal(config.volume);
+    let show_spectrum = signal(config.show_spectrum);
     let spectrum = signal(vec![0.0_f32; 48]);
     let error = signal(String::new());
     let history = signal(Vec::<String>::new());
     let history_index = signal(-1_i32);
     let handled_end = signal(false);
-    let language = signal(String::from("en"));
-    let follow_system = signal(true);
-    let light = signal(false);
+    let language = signal(if config.lang.is_empty() {
+        "en".to_owned()
+    } else {
+        config.lang.clone()
+    });
+    let follow_system = signal(config.follow_system_theme);
+    let light = signal(config.light_ui);
     let selected_action = signal(None::<SongInfo>);
     let action_position = signal(Point {
         x: px(70.0),
@@ -432,6 +512,15 @@ pub fn App() -> impl IntoElement {
     let edit_saving = signal(false);
     let delete_target = signal(None::<SongInfo>);
     let lyric_scroll = element_ref();
+    let gallery_scroll = element_ref();
+    let gallery_viewport_y = signal(config.gallery_viewport_y);
+    let restore_path = signal(
+        config
+            .current_song_path
+            .as_ref()
+            .map(|path| path.to_string_lossy().into_owned()),
+    );
+    let restore_progress = config.progress;
     let last_lyric_index = signal(-1_i32);
     let manual_lyrics_until = signal(0_u64);
     let ignore_programmatic_scroll_until = signal(0_u64);
@@ -479,12 +568,50 @@ pub fn App() -> impl IntoElement {
         edit_saving,
         delete_target,
         lyric_scroll,
+        gallery_scroll,
+        gallery_viewport_y,
         last_lyric_index,
         manual_lyrics_until,
         ignore_programmatic_scroll_until,
         track_width,
         lyric_panel_height,
     };
+    let pending_save: Rc<RefCell<Option<nsh_core::element::ambient::Spawned<()>>>> =
+        Rc::new(RefCell::new(None));
+    let first_save_effect_run = Rc::new(Cell::new(true));
+    nsh_core::element::effect({
+        let pending_save = Rc::clone(&pending_save);
+        let first_save_effect_run = Rc::clone(&first_save_effect_run);
+        move || {
+            let _ = (
+                app.page.get(),
+                app.directory.get(),
+                app.current.get(),
+                app.sort_field.get(),
+                app.ascending.get(),
+                app.mode.get(),
+                app.language.get(),
+                app.follow_system.get(),
+                app.light.get(),
+                app.volume.get(),
+                app.show_spectrum.get(),
+                expanded.get(),
+                app.gallery_viewport_y.get(),
+            );
+            if first_save_effect_run.replace(false) {
+                return;
+            }
+            if let Some(previous) = pending_save.borrow_mut().take() {
+                previous.cancel();
+            }
+            let pending_save = Rc::clone(&pending_save);
+            *pending_save.borrow_mut() = Some(nsh_core::element::ambient::set_timeout(
+                Duration::from_millis(250),
+                move || save_config_snapshot(app, expanded),
+            ));
+        }
+    });
+    nsh_core::element::cleanup(move || save_config_snapshot(app, expanded));
 
     desktop::set_title_bar(TitleBarStyle::Hidden, Some(px(40.0)));
     crate::window_constraints::set_minimum_size(850.0, 500.0);
@@ -529,7 +656,16 @@ pub fn App() -> impl IntoElement {
                 Ok(found) => {
                     songs.set(found.clone());
                     search_results.set(search_songs(&found, &query.get()));
-                    let _ = Storage::set_item("zeedle.music-directory", path);
+                    let gallery_offset = app.gallery_viewport_y.get();
+                    nsh_core::element::ambient::set_timeout(Duration::from_millis(50), move || {
+                        app.gallery_scroll.scroll_to(
+                            Point {
+                                x: px(0.0),
+                                y: px(gallery_offset),
+                            },
+                            false,
+                        );
+                    });
                     if found.is_empty() {
                         Music::stop();
                         current.set(None);
@@ -542,9 +678,47 @@ pub fn App() -> impl IntoElement {
                         let selected = found
                             .iter()
                             .find(|song| Some(&song.song_path) == active_path.as_ref())
+                            .or_else(|| {
+                                restore_path.get().as_deref().and_then(|path| {
+                                    found
+                                        .iter()
+                                        .find(|song| same_song_path(&song.song_path, path))
+                                })
+                            })
                             .cloned();
                         if let Some(song) = selected {
-                            current.set(Some(song));
+                            let needs_load =
+                                active_path.as_deref() != Some(song.song_path.as_str());
+                            current.set(Some(song.clone()));
+                            if needs_load {
+                                Music::load(song.song_path.clone());
+                                let progress = if restore_path
+                                    .get()
+                                    .as_deref()
+                                    .is_some_and(|path| same_song_path(&song.song_path, path))
+                                {
+                                    restore_progress.min(song.duration_secs).max(0.0)
+                                } else {
+                                    0.0
+                                };
+                                position.set(progress);
+                                duration.set(song.duration_secs);
+                                if progress > 0.0 {
+                                    Music::seek(progress);
+                                }
+                                let lyric_json = Music::lyrics(song.song_path.clone()).await;
+                                let cover_uri = Music::cover(song.song_path.clone()).await;
+                                if let Ok(found_lyrics) =
+                                    serde_json::from_str::<Vec<LyricItem>>(&lyric_json)
+                                {
+                                    lyrics.set(found_lyrics);
+                                }
+                                art.set(if cover_uri.is_empty() {
+                                    COVER.uri.to_string()
+                                } else {
+                                    cover_uri
+                                });
+                            }
                         } else {
                             let first = found[0].clone();
                             current.set(Some(first.clone()));
@@ -576,37 +750,19 @@ pub fn App() -> impl IntoElement {
         });
     };
 
-    spawn(async move {
-        let saved_directory =
-            Storage::get_item("zeedle.music-directory").unwrap_or_else(Music::default_directory);
-        if let Some(saved_volume) = Storage::get_item("zeedle.volume")
-            && let Ok(parsed) = saved_volume.parse::<f32>()
-        {
-            volume.set(parsed.clamp(0.0, 1.0));
-        }
-        if let Some(saved_mode) = Storage::get_item("zeedle.play-mode")
-            && ["repeat", "random"].contains(&saved_mode.as_str())
-        {
-            mode.set(saved_mode);
-        }
-        if let Some(saved_spectrum) = Storage::get_item("zeedle.show-spectrum") {
-            show_spectrum.set(saved_spectrum == "true");
-        }
-        if let Some(saved_language) = Storage::get_item("zeedle.language") {
-            language.set(saved_language);
-        }
-        if let Some(saved_theme) = Storage::get_item("zeedle.light-theme") {
-            follow_system.set(false);
-            light.set(saved_theme == "true");
-            nsh_core::element::ambient::set_color_scheme(if saved_theme == "true" {
-                Appearance::Light
-            } else {
-                Appearance::Dark
-            });
+    if config.follow_system_theme {
+        nsh_core::element::ambient::set_color_scheme(Appearance::System);
+    } else {
+        nsh_core::element::ambient::set_color_scheme(if config.light_ui {
+            Appearance::Light
         } else {
-            follow_system.set(true);
-            light.set(!nsh_core::element::ambient::dark());
-            nsh_core::element::ambient::set_color_scheme(Appearance::System);
+            Appearance::Dark
+        });
+    }
+    let saved_directory = directory.get();
+    spawn(async move {
+        for key in LEGACY_STORAGE_KEYS {
+            let _ = Storage::remove_item(key);
         }
         Music::set_volume(volume.get());
         Music::set_spectrum_enabled(show_spectrum.get());
@@ -615,8 +771,8 @@ pub fn App() -> impl IntoElement {
 
     set_interval(Duration::from_millis(120), move || {
         if let Ok(state) = serde_json::from_str::<PlaybackState>(&Music::state()) {
-            position.set(state.position);
-            if state.duration > 0.0 {
+            if !state.paused && state.duration > 0.0 {
+                position.set(state.position);
                 duration.set(state.duration);
             }
             paused.set(state.paused);
@@ -801,7 +957,6 @@ pub fn App() -> impl IntoElement {
                                 } else {
                                     Appearance::Dark
                                 });
-                                let _ = Storage::set_item("zeedle.light-theme", next.to_string());
                             }
                         })
                         .opacity(move || {
@@ -1916,6 +2071,10 @@ fn song_list(app: UiState, songs: Memo<Vec<SongInfo>>) -> impl IntoElement {
         })
     })
     .estimated_item_size(px(30.0))
+    .element_ref(&app.gallery_scroll)
+    .on_scroll(move |event: &ScrollEvent| {
+        app.gallery_viewport_y.set(event.offset.y.0.max(0.0));
+    })
     .flex_1()
     .min_h(px(0.0))
 }
@@ -2292,7 +2451,6 @@ fn settings_page(app: UiState, refresh: impl Fn(String) + Copy + 'static) -> imp
         let next = !app.show_spectrum.get();
         app.show_spectrum.set(next);
         Music::set_spectrum_enabled(next);
-        let _ = Storage::set_item("zeedle.show-spectrum", next.to_string());
     };
     view()
         .test_id("screen-3")
@@ -2423,14 +2581,9 @@ fn settings_page(app: UiState, refresh: impl Fn(String) + Copy + 'static) -> imp
                                         nsh_core::element::ambient::set_color_scheme(
                                             Appearance::System,
                                         );
-                                        let _ = Storage::remove_item("zeedle.light-theme");
                                     } else {
                                         let current_light = !nsh_core::element::ambient::dark();
                                         app.light.set(current_light);
-                                        let _ = Storage::set_item(
-                                            "zeedle.light-theme",
-                                            app.light.get().to_string(),
-                                        );
                                         nsh_core::element::ambient::set_color_scheme(
                                             if app.light.get() {
                                                 Appearance::Light
@@ -2451,14 +2604,9 @@ fn settings_page(app: UiState, refresh: impl Fn(String) + Copy + 'static) -> imp
                                             nsh_core::element::ambient::set_color_scheme(
                                                 Appearance::System,
                                             );
-                                            let _ = Storage::remove_item("zeedle.light-theme");
                                         } else {
                                             let current_light = !nsh_core::element::ambient::dark();
                                             app.light.set(current_light);
-                                            let _ = Storage::set_item(
-                                                "zeedle.light-theme",
-                                                app.light.get().to_string(),
-                                            );
                                             nsh_core::element::ambient::set_color_scheme(
                                                 if app.light.get() {
                                                     Appearance::Light
@@ -2547,7 +2695,6 @@ fn language_button(
         })
         .on_press(move || {
             language.set(code.to_string());
-            let _ = Storage::set_item("zeedle.language", code);
         })
         .child(text(label).text_size(px(12.0)).text_color(move || {
             if language.get() == code {
@@ -2667,7 +2814,6 @@ fn player_panel(app: UiState) -> impl IntoElement {
         let value = value.clamp(0.0, 1.0);
         app.volume.set(value);
         Music::set_volume(value);
-        let _ = Storage::set_item("zeedle.volume", value.to_string());
     };
     let set_volume_at = move |y: f32| set_volume(1.0 - y / 55.0);
     let progress = move || {
@@ -2768,7 +2914,6 @@ fn player_panel(app: UiState) -> impl IntoElement {
                                 "order"
                             };
                             app.mode.set(next.to_string());
-                            let _ = Storage::set_item("zeedle.play-mode", next);
                         })
                         .child(
                             when(
@@ -2876,7 +3021,6 @@ fn player_panel(app: UiState) -> impl IntoElement {
                                 "random"
                             };
                             app.mode.set(next.to_string());
-                            let _ = Storage::set_item("zeedle.play-mode", next);
                         })
                         .child(
                             when(
@@ -2971,7 +3115,6 @@ fn player_panel(app: UiState) -> impl IntoElement {
                                 .on_press(move || {
                                     let next = if app.volume.get() > 0.0 { 0.0 } else { 0.8 };
                                     set_volume(next);
-                                    let _ = Storage::set_item("zeedle.volume", next.to_string());
                                 })
                                 .child(
                                     when(
@@ -2983,4 +3126,35 @@ fn player_panel(app: UiState) -> impl IntoElement {
                         ),
                 ),
         )
+}
+
+#[cfg(test)]
+mod config_mapping_tests {
+    use super::{
+        play_mode_from_config, play_mode_to_config, same_song_path, sort_key_from_config,
+        sort_key_to_config,
+    };
+    use crate::config::{PlayMode, SortKey};
+
+    #[test]
+    fn play_modes_round_trip_between_slint_and_ui_names() {
+        for mode in [PlayMode::InOrder, PlayMode::Recursive, PlayMode::Random] {
+            assert_eq!(play_mode_to_config(play_mode_from_config(mode)), mode);
+        }
+    }
+
+    #[test]
+    fn sort_keys_round_trip_between_slint_and_ui_names() {
+        for key in [SortKey::BySongName, SortKey::BySinger, SortKey::ByDuration] {
+            assert_eq!(sort_key_to_config(sort_key_from_config(key)), key);
+        }
+    }
+
+    #[test]
+    fn matches_saved_paths_across_windows_separator_styles() {
+        assert!(same_song_path(
+            "C:/Users/test/Music/song.wav",
+            r"C:\Users\test\Music\song.wav"
+        ));
+    }
 }

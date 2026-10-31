@@ -22,6 +22,8 @@ use nsh_core::prelude::*;
 use rodio::{Decoder, DeviceSinkBuilder, Player, Source};
 use serde::{Deserialize, Serialize};
 
+mod config;
+mod logger;
 mod spectrum;
 #[cfg(windows)]
 mod startup;
@@ -31,9 +33,33 @@ use spectrum::{SpectrumChunk, TapSource, default_spectrum, try_start_spectrum_wo
 
 #[native_module("zeedle-nsh/native")]
 fn native(registry: &mut Registry) {
+    logger::init_default_logger(None);
     registry.module::<Music>();
+    registry.module::<AppConfig>();
     registry.module::<WindowConstraints>();
     registry.register::<ui::App>().assets(assets!());
+}
+
+/// Shared Slint-compatible app configuration used by both NSH frontends.
+#[module]
+pub struct AppConfig;
+
+#[module]
+impl AppConfig {
+    /// Load the TOML configuration as JSON for the TSX UI.
+    pub fn load() -> String {
+        serde_json::to_string(&config::Config::load()).unwrap_or_else(|_| "{}".into())
+    }
+
+    /// Save a complete Config snapshot serialized as JSON.
+    pub fn save(value: String) -> String {
+        let Ok(config) = serde_json::from_str::<config::Config>(&value) else {
+            return "invalid app configuration JSON".into();
+        };
+        config
+            .save()
+            .map_or_else(|error| error.to_string(), |_| String::new())
+    }
 }
 
 /// Set the app window's initial and minimum content sizes on its native host.
@@ -111,7 +137,7 @@ fn backend() -> &'static Backend {
             position: 0.0,
             duration: 0.0,
             paused: true,
-            volume: 0.8,
+            volume: 1.0,
             error: String::new(),
             spectrum: default_spectrum(),
         }));
@@ -126,6 +152,7 @@ fn backend() -> &'static Backend {
             thread::Builder::new()
                 .name("zeedle-audio".into())
                 .spawn(move || {
+                    log::info!("audio backend thread running");
                     let mut sink = DeviceSinkBuilder::open_default_sink();
                     if let Ok(sink) = &mut sink {
                         sink.log_on_drop(false);
@@ -135,6 +162,7 @@ fn backend() -> &'static Backend {
                         .ok()
                         .map(|sink| Player::connect_new(sink.mixer()));
                     if let Err(error) = &sink {
+                        log::error!("audio output unavailable: {error}");
                         thread_state.lock().unwrap().error =
                             format!("Audio output unavailable: {error}");
                     }
@@ -144,6 +172,7 @@ fn backend() -> &'static Backend {
                     loop {
                         match rx.recv_timeout(Duration::from_millis(60)) {
                             Ok(Command::Load(path, autoplay)) => {
+                                log::info!("loading audio file: {}", path.display());
                                 let result = File::open(&path)
                                     .map_err(|error| error.to_string())
                                     .and_then(|file| {
@@ -171,7 +200,10 @@ fn backend() -> &'static Backend {
                                         state.paused = !autoplay;
                                         state.error.clear();
                                     }
-                                    (_, Err(error)) => thread_state.lock().unwrap().error = error,
+                                    (_, Err(error)) => {
+                                        log::error!("failed to load {}: {error}", path.display());
+                                        thread_state.lock().unwrap().error = error;
+                                    }
                                     (None, Ok(_)) => {}
                                 }
                             }
@@ -216,6 +248,7 @@ fn backend() -> &'static Backend {
                                         if let Err(error) = player
                                             .try_seek(Duration::from_secs_f32(seconds.max(0.0)))
                                         {
+                                            log::error!("failed to seek to {seconds}s: {error}");
                                             thread_state.lock().unwrap().error = error.to_string();
                                         }
                                     }
@@ -507,7 +540,17 @@ impl Music {
     }
     /// Scan one directory for supported music files and read their Lofty tags.
     pub async fn scan(directory: String) -> String {
-        serde_json::to_string(&scan(Path::new(&directory))).unwrap_or_else(|_| "[]".into())
+        log::info!("scanning music directory: {directory}");
+        let songs = scan(Path::new(&directory));
+        if songs.is_empty() {
+            log::warn!("no supported songs found in {directory}");
+        } else {
+            log::info!("found {} songs in {directory}", songs.len());
+        }
+        serde_json::to_string(&songs).unwrap_or_else(|error| {
+            log::error!("failed to serialize scanned songs: {error}");
+            "[]".into()
+        })
     }
 
     /// Read embedded lyrics from an audio file and parse LRC timestamps.
@@ -556,6 +599,7 @@ impl Music {
         cover_path: String,
         lyrics_path: String,
     ) -> String {
+        log::info!("updating metadata for {path}");
         let cover = if cover_path.is_empty() {
             None
         } else {
@@ -651,7 +695,14 @@ impl Music {
 
     /// Delete a selected audio file. An empty result means it was deleted.
     pub async fn delete_song(path: String) -> String {
-        std::fs::remove_file(path).map_or_else(|error| error.to_string(), |_| String::new())
+        log::info!("deleting song file: {path}");
+        std::fs::remove_file(&path).map_or_else(
+            |error| {
+                log::error!("failed to delete {path}: {error}");
+                error.to_string()
+            },
+            |_| String::new(),
+        )
     }
 
     /// Show a native folder picker. An empty result means it was cancelled.
@@ -677,16 +728,19 @@ impl Music {
 
     /// Start or replace the current track with rodio.
     pub fn play(path: String) {
+        log::info!("request to play: {path}");
         let _ = backend().tx.send(Command::Load(PathBuf::from(path), true));
     }
 
     /// Load the selected track without starting playback.
     pub fn load(path: String) {
+        log::info!("request to load: {path}");
         let _ = backend().tx.send(Command::Load(PathBuf::from(path), false));
     }
 
     /// Toggle playback, starting the selected track when possible.
     pub fn toggle() {
+        log::info!("request to toggle playback");
         let _ = backend().tx.send(Command::Toggle);
     }
 
@@ -697,17 +751,20 @@ impl Music {
 
     /// Seek to a position in seconds.
     pub fn seek(seconds: f32) {
+        log::debug!("request to seek to {seconds}s");
         let _ = backend().tx.send(Command::Seek(seconds));
     }
 
     /// Change playback volume between zero and one.
     pub fn set_volume(volume: f32) {
         let volume = volume.clamp(0.0, 1.0);
+        log::info!("volume changed to {volume}");
         let _ = backend().tx.send(Command::Volume(volume));
     }
 
     /// Enable or disable the FFT spectrum view.
     pub fn set_spectrum_enabled(enabled: bool) {
+        log::info!("spectrum display set to {enabled}");
         let backend = backend();
         backend.spectrum_enabled.store(enabled, Ordering::Relaxed);
         if !enabled {

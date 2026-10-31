@@ -1,7 +1,7 @@
-import { Image, LayoutAnimation, List, Scroll, Storage, Text as NshText, View, colorScheme, keymap, mount, platform, setColorScheme, signal, split, token, windowSize, type YNode } from "nsh";
+import { cleanup, effect, Image, LayoutAnimation, List, Scroll, Storage, Text as NshText, View, colorScheme, keymap, mount, platform, setColorScheme, signal, split, token, windowSize, type YNode } from "nsh";
 import { Input } from "nsh/base";
 import { Menu, titleBar, Window } from "nsh/desktop";
-import { Music, WindowConstraints } from "zeedle-nsh/native";
+import { AppConfig, Music, WindowConstraints } from "zeedle-nsh/native";
 import { LucideIcon, type LucideName } from "./icons";
 import cover from "./assets/cover.svg";
 import { translate, type Language } from "./translations";
@@ -12,6 +12,12 @@ type PlayMode = "order" | "repeat" | "random";
 type SongInfo = { id: number; song_name: string; singer: string; duration: string; duration_secs: number; song_path: string };
 type LyricItem = { time: number; duration: number; text: string };
 type PlaybackState = { position: number; duration: number; paused: boolean; volume: number; error: string; spectrum: number[] };
+type AppConfigValue = {
+  song_dir: string; current_song_path: string | null; progress: number; play_mode: "InOrder" | "Recursive" | "Random";
+  sort_key: "BySongName" | "BySinger" | "ByDuration"; sort_ascending: boolean; lang: string; light_ui: boolean;
+  follow_system_theme: boolean; volume: number; show_spectrum: boolean; current_page: number; sidebar_expanded: boolean;
+  gallery_viewport_y: number;
+};
 
 type NshTextProps = Parameters<typeof NshText>[0];
 function Text(props: NshTextProps) {
@@ -28,13 +34,18 @@ function timeLabel(seconds: number) {
   return `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
 }
 
+function sameSongPath(left: string | null | undefined, right: string | null | undefined) {
+  return left?.replaceAll("\\", "/") === right?.replaceAll("\\", "/");
+}
+
 function App() {
-  const page = signal<Page>(0);
-  const expanded = signal(false);
+  const config = JSON.parse(AppConfig.load()) as AppConfigValue;
+  const page = signal<Page>(Math.max(0, Math.min(4, config.current_page)) as Page);
+  const expanded = signal(config.sidebar_expanded);
   const light = () => colorScheme() === "light";
-  const followSystem = signal(true);
-  const language = signal<Language>("en");
-  const directory = signal(Music.defaultDirectory());
+  const followSystem = signal(config.follow_system_theme);
+  const language = signal<Language>((config.lang || "en") as Language);
+  const directory = signal(config.song_dir || Music.defaultDirectory());
   const songs = signal<SongInfo[]>([]);
   const current = signal<SongInfo | null>(null);
   const lyrics = signal<LyricItem[]>([]);
@@ -43,15 +54,17 @@ function App() {
   const search = signal("");
   const searchResults = signal<SongInfo[]>([]);
   const loading = signal(false);
-  const sortField = signal<SortField>("song_name");
-  const ascending = signal(true);
-  const mode = signal<PlayMode>("order");
-  const position = signal(0);
+  const sortField = signal<SortField>(config.sort_key === "BySinger" ? "singer" : config.sort_key === "ByDuration" ? "duration_secs" : "song_name");
+  const ascending = signal(config.sort_ascending);
+  const mode = signal<PlayMode>(config.play_mode === "Recursive" ? "repeat" : config.play_mode === "Random" ? "random" : "order");
+  const position = signal(config.progress);
   const duration = signal(0);
   const paused = signal(true);
   const playerLoaded = signal(false);
-  const volume = signal(0.8);
-  const showSpectrum = signal(true);
+  const volume = signal(config.volume);
+  const showSpectrum = signal(config.show_spectrum);
+  const galleryViewportY = signal(config.gallery_viewport_y);
+  const requestedSongPath = config.current_song_path;
   const spectrumBars = signal<number[]>(Array.from({ length: 48 }, () => 0));
   const playerError = signal("");
   const trackWidth = signal(1);
@@ -84,6 +97,8 @@ function App() {
   }
 
   Window.setTitle("Zeedle");
+  if (config.follow_system_theme) setColorScheme("system");
+  else setColorScheme(config.light_ui ? "light" : "dark");
   Window.setTitleBar("hidden", 40);
   WindowConstraints.setMinimumSize(850, 500);
   const initialWindowSize = windowSize();
@@ -141,7 +156,6 @@ function App() {
       songs.set(result);
       searchResults.set(searchSongs(search()));
       directory.set(path);
-      await Storage.setItem("zeedle.music-directory", path);
       const updatedCurrent = result.find((song) => song.song_path === current()?.song_path);
       if (updatedCurrent) current.set(updatedCurrent);
       if (!result.length) {
@@ -154,16 +168,20 @@ function App() {
         duration.set(0);
         return;
       }
-      const active = result.find((song) => song.song_path === current()?.song_path) ?? result[0];
+      const active = result.find((song) => sameSongPath(song.song_path, current()?.song_path ?? requestedSongPath)) ?? result[0];
       if (!current() || !result.some((song) => song.song_path === current()?.song_path)) {
         Music.stop();
         playerLoaded.set(true);
         current.set(active);
-        position.set(0);
+        const restoreProgress = sameSongPath(active.song_path, requestedSongPath)
+          ? Math.max(0, Math.min(config.progress, active.duration_secs))
+          : 0;
+        position.set(restoreProgress);
         duration.set(active.duration_secs);
         paused.set(true);
         lastAutoScrolledLyric = -1;
         Music.load(active.song_path);
+        if (restoreProgress > 0) Music.seek(restoreProgress);
         const [lyricsJson, nextArt] = await Promise.all([Music.lyrics(active.song_path), Music.cover(active.song_path)]);
         if (current()?.song_path === active.song_path) {
           lyrics.set(JSON.parse(lyricsJson) as LyricItem[]);
@@ -252,7 +270,6 @@ function App() {
 
   function changeMode(next: "order" | "repeat" | "random") {
     mode.set(next);
-    void Storage.setItem("zeedle.play-mode", next);
   }
 
   function seekTo(seconds: number) {
@@ -416,34 +433,50 @@ function App() {
   }
 
   void (async () => {
-    const [savedDirectory, savedTheme, savedVolume, savedMode, savedSpectrum, savedLanguage] = await Promise.all([
-      Storage.getItem("zeedle.music-directory"),
-      Storage.getItem("zeedle.light-theme"),
-      Storage.getItem("zeedle.volume"),
-      Storage.getItem("zeedle.play-mode"),
-      Storage.getItem("zeedle.show-spectrum"),
-      Storage.getItem("zeedle.language"),
-    ]);
-    if (savedTheme !== null) { followSystem.set(false); setColorScheme(savedTheme === "true" ? "light" : "dark"); }
-    else { followSystem.set(true); setColorScheme("system"); }
-    if (savedVolume !== null) {
-      const parsed = Number(savedVolume);
-      if (Number.isFinite(parsed)) volume.set(Math.max(0, Math.min(1, parsed)));
-    }
-    if (savedMode === "repeat" || savedMode === "random") mode.set(savedMode);
+    await Promise.all([
+      "zeedle.music-directory", "zeedle.volume", "zeedle.play-mode", "zeedle.show-spectrum", "zeedle.language", "zeedle.light-theme",
+    ].map((key) => Storage.removeItem(key)));
     Music.setVolume(volume());
-    if (savedSpectrum !== null) showSpectrum.set(savedSpectrum === "true");
-    if (savedLanguage === "zh" || savedLanguage === "es" || savedLanguage === "fr" || savedLanguage === "de" || savedLanguage === "ru") language.set(savedLanguage);
     Music.setSpectrumEnabled(showSpectrum());
-    await refreshSongs(savedDirectory || directory());
+    await refreshSongs(directory());
   })().catch((error) => playerError.set(String(error))).finally(() => {
     setTimeout(() => Music.finishStartup?.(), 150);
   });
 
+  function saveConfig() {
+    const snapshot: AppConfigValue = {
+      ...config,
+      song_dir: directory(), current_song_path: current()?.song_path ?? null,
+      progress: position(),
+      play_mode: mode() === "repeat" ? "Recursive" : mode() === "random" ? "Random" : "InOrder",
+      sort_key: sortField() === "singer" ? "BySinger" : sortField() === "duration_secs" ? "ByDuration" : "BySongName",
+      sort_ascending: ascending(), lang: language() === "en" ? "" : language(),
+      light_ui: light(), follow_system_theme: followSystem(), volume: volume(), show_spectrum: showSpectrum(),
+      current_page: page(), sidebar_expanded: expanded(), gallery_viewport_y: galleryViewportY(),
+    };
+    const error = AppConfig.save(JSON.stringify(snapshot));
+    if (error) console.error(`failed to save config: ${error}`);
+  }
+
+  let firstConfigEffectRun = true;
+  effect(() => {
+    page(); expanded(); directory(); current()?.song_path; mode(); sortField(); ascending(); language();
+    light(); followSystem(); volume(); showSpectrum(); galleryViewportY();
+    if (firstConfigEffectRun) {
+      firstConfigEffectRun = false;
+      return;
+    }
+    const timer = setTimeout(saveConfig, 250);
+    return () => clearTimeout(timer);
+  });
+  cleanup(saveConfig);
+
   setInterval(() => {
     const state = JSON.parse(Music.state()) as PlaybackState;
-    position.set(state.position);
-    if (state.duration > 0) duration.set(state.duration);
+    if (!state.paused && state.duration > 0) {
+      position.set(state.position);
+      duration.set(state.duration);
+    }
     if (!pausePending()) paused.set(state.paused);
     autoScrollLyrics(state.position);
     if (state.error) playerError.set(state.error);
@@ -532,7 +565,6 @@ function App() {
       const next = Math.max(0, Math.min(1, 1 - y / 55));
       volume.set(next);
       Music.setVolume(next);
-      void Storage.setItem("zeedle.volume", String(next));
     };
     return (
       <View
@@ -560,7 +592,6 @@ function App() {
             const next = volume() > 0 ? 0 : 0.8;
             volume.set(next);
             Music.setVolume(next);
-            void Storage.setItem("zeedle.volume", String(next));
           }}
           hoverStyle={{ backgroundColor: hoverColor() }}
           activeStyle={{ backgroundColor: pressedColor() }}
@@ -604,12 +635,14 @@ function App() {
     );
   }
 
-  function SongRows(props: { items: SongInfo[] }) {
+  function SongRows(props: { items: SongInfo[]; gallery?: boolean }) {
     return (
       <List
         each={props.items}
         keyExtractor={(song) => song.song_path}
         estimatedItemSize={30}
+        contentOffset={props.gallery ? { x: 0, y: config.gallery_viewport_y } : undefined}
+        onScroll={props.gallery ? (event) => galleryViewportY.set(Math.max(0, event.offset.y)) : undefined}
         style={{ flex: 1, backgroundColor: pageColor() }}
         contentStyle={{ paddingBottom: 0 }}
         empty={
@@ -685,7 +718,7 @@ function App() {
             {sortField() === "duration_secs" ? <LucideIcon name={ascending() ? "arrowUp" : "arrowDown"} size={12} color={mutedColor()} /> : null}
           </View>
         </View>
-        <SongRows items={displayedSongs()} />
+        <SongRows items={displayedSongs()} gallery />
       </View>
     );
   }
@@ -776,19 +809,16 @@ function App() {
       if (next) {
         followSystem.set(true);
         setColorScheme("system");
-        void Storage.removeItem("zeedle.light-theme");
       } else {
         const currentScheme = colorScheme();
         followSystem.set(false);
         setColorScheme(currentScheme);
-        void Storage.setItem("zeedle.light-theme", String(currentScheme === "light"));
       }
     };
     const changeSpectrum = () => {
       const next = !showSpectrum();
       showSpectrum.set(next);
       Music.setSpectrumEnabled(next);
-      void Storage.setItem("zeedle.show-spectrum", String(next));
     };
     const checkbox = (checked: boolean, onPress: () => void) => (
       <View
@@ -852,7 +882,6 @@ function App() {
                   testID={`language-${option.code}`}
                   onPress={() => {
                     language.set(option.code as Language);
-                    void Storage.setItem("zeedle.language", option.code);
                   }}
                   style={{
                     flex: 1,
@@ -983,7 +1012,6 @@ function App() {
               if (followSystem()) return;
               const next = !light();
               setColorScheme(next ? "light" : "dark");
-              void Storage.setItem("zeedle.light-theme", String(next));
             }}
             style={{ width: 42, height: 40, alignItems: "center", justifyContent: "center" }}
           >
