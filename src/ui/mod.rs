@@ -2790,7 +2790,7 @@ fn about_page(app: UiState) -> impl IntoElement {
         .child(
             text(move || {
                 format!(
-                    "{} Jordan Haidee\n{} 0.2.1",
+                    "{} Jordan Haidee\n{} 0.2.2",
                     localized(&app.language.get(), "Author:"),
                     localized(&app.language.get(), "Version:")
                 )
