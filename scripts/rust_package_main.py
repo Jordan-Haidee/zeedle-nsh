@@ -8,6 +8,9 @@ from pathlib import Path
 
 
 def main_source(target: str) -> str:
+    if target == "windows":
+        return Path("scripts/windows-rust-main.rs").read_text(encoding="utf-8")
+
     asset_dir = (
         'app_dir.parent().expect("Contents directory").join("Resources/nsh")'
         if target == "macos"

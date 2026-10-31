@@ -16,6 +16,8 @@ public struct WindowPoint { public int X; public int Y; }
 [StructLayout(LayoutKind.Sequential)]
 public struct WindowRect { public int Left; public int Top; public int Right; public int Bottom; }
 [StructLayout(LayoutKind.Sequential)]
+public struct WindowMonitorInfo { public int Size; public WindowRect Monitor; public WindowRect Work; public uint Flags; }
+[StructLayout(LayoutKind.Sequential)]
 public struct WindowMinMaxInfo {
   public WindowPoint Reserved;
   public WindowPoint MaxSize;
@@ -33,6 +35,8 @@ public static class NativeWindowConstraintsProbe {
   [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr hwnd);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out WindowRect rect);
   [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr hwnd, out WindowRect rect);
+  [DllImport("user32.dll")] public static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+  [DllImport("user32.dll", EntryPoint = "GetMonitorInfoW")] public static extern bool GetMonitorInfo(IntPtr monitor, ref WindowMonitorInfo info);
   [DllImport("user32.dll", EntryPoint = "SendMessageW")] static extern IntPtr SendMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
   [DllImport("user32.dll")] public static extern bool PostMessageW(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
 
@@ -81,10 +85,16 @@ try {
     if ($window -eq [IntPtr]::Zero) { Start-Sleep -Milliseconds 100 }
   } while ($window -eq [IntPtr]::Zero -and [DateTime]::UtcNow -lt $deadline)
   if ($window -eq [IntPtr]::Zero) { throw "Packaged $Ui UI did not create a visible NSH window" }
+  $firstVisible = [WindowRect]::new()
+  if (![NativeWindowConstraintsProbe]::GetWindowRect($window, [ref]$firstVisible)) { throw 'Initial GetWindowRect failed' }
   if ($Ui -eq 'rustui') { Start-Sleep -Seconds 2 }
 
   $client = [WindowRect]::new()
   $outer = [WindowRect]::new()
+  $monitorInfo = [WindowMonitorInfo]::new()
+  $monitorInfo.Size = [Runtime.InteropServices.Marshal]::SizeOf($monitorInfo)
+  $monitor = [NativeWindowConstraintsProbe]::MonitorFromWindow($window, 2)
+  if (![NativeWindowConstraintsProbe]::GetMonitorInfo($monitor, [ref]$monitorInfo)) { throw 'GetMonitorInfo failed' }
   if (![NativeWindowConstraintsProbe]::GetWindowRect($window, [ref]$outer)) { throw 'GetWindowRect failed' }
   if (![NativeWindowConstraintsProbe]::GetClientRect($window, [ref]$client)) { throw 'GetClientRect failed' }
   $dpi = [NativeWindowConstraintsProbe]::GetDpiForWindow($window)
@@ -95,7 +105,21 @@ try {
   $frameHeight = ($outer.Bottom - $outer.Top) - ($client.Bottom - $client.Top)
   $minimumWidth = [Math]::Round(($minimum.MinTrackSize.X - $frameWidth) * 96.0 / $dpi)
   $minimumHeight = [Math]::Round(($minimum.MinTrackSize.Y - $frameHeight) * 96.0 / $dpi)
-  Write-Output "${Ui}: client ${clientWidth}x${clientHeight}, minimum ${minimumWidth}x${minimumHeight} points at DPI $dpi (frame ${frameWidth}x${frameHeight}px)"
+  $centerErrorX = [Math]::Abs((($outer.Left + $outer.Right) - ($monitorInfo.Work.Left + $monitorInfo.Work.Right)) / 2)
+  $centerErrorY = [Math]::Abs((($outer.Top + $outer.Bottom) - ($monitorInfo.Work.Top + $monitorInfo.Work.Bottom)) / 2)
+  $startupGeometryChanged = @(
+    [Math]::Abs($firstVisible.Left - $outer.Left),
+    [Math]::Abs($firstVisible.Top - $outer.Top),
+    [Math]::Abs($firstVisible.Right - $outer.Right),
+    [Math]::Abs($firstVisible.Bottom - $outer.Bottom)
+  ) | Where-Object { $_ -gt 1 }
+  Write-Output "${Ui}: first rect $($firstVisible.Left),$($firstVisible.Top)-$($firstVisible.Right),$($firstVisible.Bottom); final rect $($outer.Left),$($outer.Top)-$($outer.Right),$($outer.Bottom); client ${clientWidth}x${clientHeight}, minimum ${minimumWidth}x${minimumHeight} points, center error ${centerErrorX}x${centerErrorY}px at DPI $dpi"
+  if ($centerErrorX -gt 2 -or $centerErrorY -gt 2) {
+    throw "$Ui startup window should be centered in the monitor work area"
+  }
+  if ($startupGeometryChanged) {
+    throw "$Ui window moved or resized after its first visible frame"
+  }
   if ([Math]::Abs($clientWidth - 900) -gt 1 -or [Math]::Abs($clientHeight - 510) -gt 1) {
     throw "$Ui startup client size should be 900x510 points"
   }

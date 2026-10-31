@@ -29,6 +29,20 @@ pub(crate) fn configure(width: f32, height: f32, min_width: f32, min_height: f32
     linux::configure(width, height, min_width, min_height);
 }
 
+fn centered_origin(
+    work_left: i32,
+    work_top: i32,
+    work_right: i32,
+    work_bottom: i32,
+    window_width: i32,
+    window_height: i32,
+) -> (i32, i32) {
+    (
+        work_left + (work_right - work_left - window_width) / 2,
+        work_top + (work_bottom - work_top - window_height) / 2,
+    )
+}
+
 #[cfg(windows)]
 mod windows {
     use std::sync::{
@@ -38,14 +52,17 @@ mod windows {
 
     use windows::Win32::{
         Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM},
+        Graphics::Gdi::{
+            GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromWindow,
+        },
         System::Threading::GetCurrentProcessId,
         UI::{
             HiDpi::GetDpiForWindow,
             WindowsAndMessaging::{
                 CallWindowProcW, DefWindowProcW, EnumWindows, GWLP_WNDPROC, GetClassNameW,
                 GetClientRect, GetWindowLongPtrW, GetWindowRect, GetWindowThreadProcessId,
-                MINMAXINFO, PostMessageW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER,
-                SetWindowLongPtrW, SetWindowPos, WM_APP, WM_GETMINMAXINFO, WNDPROC,
+                MINMAXINFO, PostMessageW, SWP_NOACTIVATE, SWP_NOZORDER, SetWindowLongPtrW,
+                SetWindowPos, WM_APP, WM_GETMINMAXINFO, WNDPROC,
             },
         },
     };
@@ -168,16 +185,33 @@ mod windows {
                 INITIAL_HEIGHT.load(Ordering::Acquire),
                 dpi,
             );
+            let monitor = unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) };
+            let mut info = MONITORINFO {
+                cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+                ..Default::default()
+            };
+            let (x, y) = if unsafe { GetMonitorInfoW(monitor, &mut info) }.as_bool() {
+                super::centered_origin(
+                    info.rcWork.left,
+                    info.rcWork.top,
+                    info.rcWork.right,
+                    info.rcWork.bottom,
+                    width,
+                    height,
+                )
+            } else {
+                (0, 0)
+            };
             // SAFETY: this message is handled on the thread that owns hwnd.
             let _ = unsafe {
                 SetWindowPos(
                     hwnd,
                     None,
-                    0,
-                    0,
+                    x,
+                    y,
                     width,
                     height,
-                    SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
+                    SWP_NOZORDER | SWP_NOACTIVATE,
                 )
             };
             return LRESULT(0);
@@ -265,6 +299,7 @@ mod macos {
                 if window.title().to_string() == "Zeedle" {
                     window.setContentMinSize(NSSize::new(min_width as f64, min_height as f64));
                     window.setContentSize(NSSize::new(width as f64, height as f64));
+                    window.center();
                 }
             }
         });
@@ -299,5 +334,20 @@ mod linux {
                 }
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::centered_origin;
+
+    #[test]
+    fn centers_in_monitor_work_area_with_taskbar_offset() {
+        assert_eq!(centered_origin(0, 0, 1920, 1040, 900, 510), (510, 265));
+    }
+
+    #[test]
+    fn centers_on_negative_origin_monitor() {
+        assert_eq!(centered_origin(-1920, 0, 0, 1080, 900, 510), (-1410, 285));
     }
 }

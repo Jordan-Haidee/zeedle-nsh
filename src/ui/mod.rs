@@ -110,6 +110,18 @@ fn same_song_path(left: &str, right: &str) -> bool {
     left.replace('\\', "/") == right.replace('\\', "/")
 }
 
+fn initial_window_dimensions(width: f32, height: f32) -> (f32, f32) {
+    let host_defaults = [(1200.0, 800.0), (390.0, 844.0), (850.0, 500.0)];
+    let is_host_default = host_defaults.iter().any(|(default_width, default_height)| {
+        (width - default_width).abs() <= 1.0 && (height - default_height).abs() <= 1.0
+    });
+    if is_host_default {
+        (900.0, 510.0)
+    } else {
+        (width.max(850.0), height.max(500.0))
+    }
+}
+
 fn save_config_snapshot(app: UiState, expanded: Signal<bool>) {
     let playback = serde_json::from_str::<PlaybackState>(&Music::state()).ok();
     let config = Config {
@@ -450,18 +462,8 @@ fn localized(language: &str, text: &str) -> String {
 pub fn App() -> impl IntoElement {
     let config = Config::load();
     let window_size = nsh_core::element::ambient::window();
-    let host_default_size = (window_size.width.0 == 1200.0 && window_size.height.0 == 800.0)
-        || (window_size.width.0 == 390.0 && window_size.height.0 == 844.0);
-    let initial_width = if host_default_size {
-        900.0
-    } else {
-        window_size.width.0.max(850.0)
-    };
-    let initial_height = if host_default_size {
-        510.0
-    } else {
-        window_size.height.0.max(500.0)
-    };
+    let (initial_width, initial_height) =
+        initial_window_dimensions(window_size.width.0, window_size.height.0);
     let page = signal(config.current_page.clamp(0, 4) as u8);
     let expanded = signal(config.sidebar_expanded);
     let directory = signal(config.song_dir.to_string_lossy().into_owned());
@@ -615,8 +617,16 @@ pub fn App() -> impl IntoElement {
 
     desktop::set_title_bar(TitleBarStyle::Hidden, Some(px(40.0)));
     crate::window_constraints::set_minimum_size(850.0, 500.0);
+    #[cfg(not(target_os = "linux"))]
     nsh_core::element::ambient::set_timeout(Duration::from_millis(150), move || {
         crate::window_constraints::configure(initial_width, initial_height, 850.0, 500.0);
+    });
+    nsh_core::element::effect(move || {
+        if !startup_pending.get() {
+            nsh_core::element::ambient::set_timeout(Duration::from_millis(150), || {
+                Music::finish_startup();
+            });
+        }
     });
     let shortcut_options = KeyOptions {
         when: nsh_core::keymap::When::NotEditing,
@@ -745,7 +755,6 @@ pub fn App() -> impl IntoElement {
             loading.set(false);
             if startup_pending.get() {
                 startup_pending.set(false);
-                Music::finish_startup();
             }
         });
     };
@@ -2781,7 +2790,7 @@ fn about_page(app: UiState) -> impl IntoElement {
         .child(
             text(move || {
                 format!(
-                    "{} Jordan Haidee\n{} 0.2.0",
+                    "{} Jordan Haidee\n{} 0.2.1",
                     localized(&app.language.get(), "Author:"),
                     localized(&app.language.get(), "Version:")
                 )
@@ -3131,8 +3140,8 @@ fn player_panel(app: UiState) -> impl IntoElement {
 #[cfg(test)]
 mod config_mapping_tests {
     use super::{
-        play_mode_from_config, play_mode_to_config, same_song_path, sort_key_from_config,
-        sort_key_to_config,
+        initial_window_dimensions, play_mode_from_config, play_mode_to_config, same_song_path,
+        sort_key_from_config, sort_key_to_config,
     };
     use crate::config::{PlayMode, SortKey};
 
@@ -3156,5 +3165,18 @@ mod config_mapping_tests {
             "C:/Users/test/Music/song.wav",
             r"C:\Users\test\Music\song.wav"
         ));
+    }
+
+    #[test]
+    fn rounds_host_default_sizes_to_the_slint_window_size() {
+        assert_eq!(initial_window_dimensions(1200.7, 800.4), (900.0, 510.0));
+        assert_eq!(initial_window_dimensions(390.4, 844.8), (900.0, 510.0));
+        assert_eq!(initial_window_dimensions(850.4, 500.2), (900.0, 510.0));
+    }
+
+    #[test]
+    fn keeps_a_custom_window_size_above_the_slint_minimum() {
+        assert_eq!(initial_window_dimensions(1440.0, 900.0), (1440.0, 900.0));
+        assert_eq!(initial_window_dimensions(800.0, 480.0), (850.0, 500.0));
     }
 }
