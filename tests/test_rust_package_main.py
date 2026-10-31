@@ -16,6 +16,9 @@ class RustPackageMainTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn("size: (900, 510)", result.stdout)
                 self.assertIn("AppSource::Rust", result.stdout)
+                self.assertIn('Theme::from_json(include_str!("../../../theme.json"))', result.stdout)
+                self.assertIn(".tokens(", result.stdout)
+                self.assertIn("AppSource::Rust(root)", result.stdout)
 
     def test_linux_tsx_runner_sets_window_size_before_loading_the_bundle(self):
         result = subprocess.run(

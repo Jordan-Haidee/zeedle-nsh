@@ -44,7 +44,12 @@ fn main() -> std::process::ExitCode {{
         limits: Limits::standalone(),
         ..AppOptions::default()
     }};
-    let source = AppSource::Rust(Root::of::<app_nsh_app_zeedle_nsh::ui::App>());
+    let root = Root::of::<app_nsh_app_zeedle_nsh::ui::App>().tokens(
+        nsh_base::Theme::from_json(include_str!("../../../theme.json"))
+            .expect("nsh.json: theme")
+            .into_tokens(),
+    );
+    let source = AppSource::Rust(root);
     {return_code}
 }}
 '''
