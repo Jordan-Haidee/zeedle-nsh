@@ -923,7 +923,7 @@ function App() {
             <Text style={{ ...textStyle(14, accentColor()), textDecorationLine: "underline" }}>NSH</Text>
           </View>
         </View>
-        <Text numberOfLines={2} style={{ ...textStyle(14, textColor()), textAlign: "center" }}>{t("Author:", "作者：")} Jordan Haidee{"\n"}{t("Version:", "版本：")} 0.1.1</Text>
+        <Text numberOfLines={2} style={{ ...textStyle(14, textColor()), textAlign: "center" }}>{t("Author:", "作者：")} Jordan Haidee{"\n"}{t("Version:", "版本：")} 0.2.0</Text>
         <View role="link" accessibilityLabel="Github" onPress={() => void openExternalUrl("https://github.com/Jordan-Haidee/Zeedle")}>
           <Text style={{ ...textStyle(14, accentColor()), textDecorationLine: "underline" }}>Github</Text>
         </View>
