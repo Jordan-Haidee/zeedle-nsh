@@ -117,11 +117,11 @@ jobs:
 
       - name: Test Rust context menu
         if: matrix.ui == 'rustui' && runner.os != 'Linux'
-        run: python scripts/with-rust-root.py nsh test tests/rust-context-menu.test.tsx --target ${{ matrix.target }}
+        run: python tests/test_rust_context_menu.py --target ${{ matrix.target }}
 
       - name: Test Rust context menu on Linux
         if: matrix.ui == 'rustui' && runner.os == 'Linux'
-        run: xvfb-run -a python scripts/with-rust-root.py nsh test tests/rust-context-menu.test.tsx --target linux
+        run: xvfb-run -a python tests/test_rust_context_menu.py --target linux
 
       - name: Package Windows TSX UI
         if: matrix.ui == 'tsxui' && runner.os == 'Windows'

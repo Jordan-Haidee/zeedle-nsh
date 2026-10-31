@@ -6,14 +6,15 @@ test("Rust song context menu follows the selected row and dismisses outside", as
     height: 510,
     colorScheme: "dark",
     storage: {
-      "zeedle.music-directory": "tests/fixtures/rust-context-menu",
-      "zeedle.show-spectrum": "false",
-      "zeedle.language": "en",
+      "zeedle.music-directory": "tests/fixtures/missing-legacy-library",
+      "zeedle.show-spectrum": "true",
+      "zeedle.language": "zh",
     },
   });
 
   await app.waitFor("text:AlphaTone");
   await app.waitFor("text:BetaTone");
+  expect(Object.keys(app.storage()).filter((key) => key.startsWith("zeedle."))).toEqual([]);
 
   await app.rightClick("text:AlphaTone");
   await app.waitFor("id:song-action-menu");
