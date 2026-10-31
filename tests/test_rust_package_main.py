@@ -4,6 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from scripts.rust_package_main import stage_windows_icons
 
 
