@@ -13,6 +13,7 @@ test("renders Rust UI pages and captures platform screenshots", async () => {
     },
   });
 
+  await app.press("id:nav-0");
   await app.waitFor("id:screen-0");
   expect((await app.screenshot("target/rust-platform-render-library.png")).length > 1000).toBe(true);
 
