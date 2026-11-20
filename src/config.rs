@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "rust-ui")]
 pub const LEGACY_STORAGE_KEYS: [&str; 6] = [
     "zeedle.music-directory",
     "zeedle.volume",

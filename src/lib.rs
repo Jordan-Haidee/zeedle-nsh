@@ -27,7 +27,9 @@ mod logger;
 mod spectrum;
 #[cfg(windows)]
 mod startup;
+#[cfg(feature = "rust-ui")]
 pub mod ui;
+#[cfg(feature = "rust-ui")]
 mod window_constraints;
 use spectrum::{SpectrumChunk, TapSource, default_spectrum, try_start_spectrum_worker};
 
@@ -36,7 +38,9 @@ fn native(registry: &mut Registry) {
     logger::init_default_logger(None);
     registry.module::<Music>();
     registry.module::<AppConfig>();
+    #[cfg(feature = "rust-ui")]
     registry.module::<WindowConstraints>();
+    #[cfg(feature = "rust-ui")]
     registry.register::<ui::App>().assets(assets!());
 }
 
@@ -63,9 +67,11 @@ impl AppConfig {
 }
 
 /// Set the app window's initial and minimum content sizes on its native host.
+#[cfg(feature = "rust-ui")]
 #[module]
 pub struct WindowConstraints;
 
+#[cfg(feature = "rust-ui")]
 #[module]
 impl WindowConstraints {
     /// Enforce the app's native minimum content size during live resizing.

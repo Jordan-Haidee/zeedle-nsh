@@ -1,12 +1,53 @@
 import { expect, open, test } from "nsh/test";
-import { Music } from "zeedle-nsh/native";
+import { AppConfig, Music } from "zeedle-nsh/native";
 
 const musicDirectory = Music.defaultDirectory();
+type TestAppConfig = {
+  song_dir: string;
+  current_song_path: string | null;
+  progress: number;
+  play_mode: "InOrder" | "Recursive" | "Random";
+  sort_key: "BySongName" | "BySinger" | "ByDuration";
+  sort_ascending: boolean;
+  lang: string;
+  light_ui: boolean;
+  follow_system_theme: boolean;
+  volume: number;
+  show_spectrum: boolean;
+  current_page: number;
+  sidebar_expanded: boolean;
+  gallery_viewport_y: number;
+};
+
+const configFromStorage = (storage: Record<string, string> = {}): TestAppConfig => ({
+  song_dir: storage["zeedle.music-directory"] ?? musicDirectory,
+  current_song_path: null,
+  progress: 0,
+  play_mode: "InOrder",
+  sort_key: "BySongName",
+  sort_ascending: true,
+  lang: "en",
+  light_ui: storage["zeedle.light-theme"] !== "false",
+  follow_system_theme: storage["zeedle.light-theme"] === undefined,
+  volume: 0.8,
+  show_spectrum: storage["zeedle.show-spectrum"] === "true",
+  current_page: 0,
+  sidebar_expanded: true,
+  gallery_viewport_y: 0,
+});
+
+const savedConfig = () => JSON.parse(AppConfig.load()) as TestAppConfig;
+
+async function openApp(options: NonNullable<Parameters<typeof open>[1]>) {
+  const error = AppConfig.save(JSON.stringify(configFromStorage(options.storage ?? {})));
+  if (error) throw new Error(error);
+  return open("./App.test-entry.tsx", options);
+}
 
 test("one pause click stays paused across playback state polls", async () => {
   const songs = JSON.parse(await Music.scan(musicDirectory)) as { song_name: string; singer: string }[];
   if (!songs.length) throw new Error("The default Music folder must contain a song for this playback test");
-  const app = await open("./App.tsx", { width: 900, height: 510, platform: "windows", storage: { "zeedle.music-directory": musicDirectory } });
+  const app = await openApp( { width: 900, height: 510, platform: "windows", storage: { "zeedle.music-directory": musicDirectory } });
   await app.waitFor(`text:${songs[0].song_name} - ${songs[0].singer}`);
   await app.press("id:control-play-pause");
   await app.waitFor("label:Pause");
@@ -31,16 +72,17 @@ test("native browser opener rejects unsafe schemes without launching", async () 
 });
 
 test("repeat and shuffle replace each other and toggle back to order", async () => {
-  const app = await open("./App.tsx", { width: 900, height: 510, platform: "windows" });
+  const app = await openApp( { width: 900, height: 510, platform: "windows" });
   await app.wait(100);
   for (const [button, expected] of [["control-repeat", "repeat"], ["control-repeat", "order"], ["control-shuffle", "random"], ["control-repeat", "order"], ["control-shuffle", "random"]]) {
     await app.press(`id:${button}`);
-    await app.waitUntil(() => app.storage()["zeedle.play-mode"] === expected);
+    const expectedConfigMode = expected === "order" ? "InOrder" : expected === "repeat" ? "Recursive" : "Random";
+    await app.waitUntil(() => savedConfig().play_mode === expectedConfigMode);
   }
 });
 
 test("navigates between the five Zeedle pages", async () => {
-  const app = await open("./App.tsx", {
+  const app = await openApp( {
     width: 900,
     height: 510,
     platform: "windows",
@@ -59,7 +101,7 @@ test("navigates between the five Zeedle pages", async () => {
 });
 
 test("metadata actions open editable and confirmation dialogs", async () => {
-  const app = await open("./App.tsx", {
+  const app = await openApp( {
     width: 900,
     height: 510,
     platform: "windows",
@@ -85,7 +127,7 @@ test("metadata actions open editable and confirmation dialogs", async () => {
 test("song rows start playback only on double click", async () => {
   const songs = JSON.parse(await Music.scan(musicDirectory)) as { song_name: string; singer: string }[];
   if (!songs.length) throw new Error("The default Music folder must contain a song for this playback test");
-  const app = await open("./App.tsx", {
+  const app = await openApp( {
     width: 900,
     height: 510,
     platform: "windows",
@@ -109,7 +151,7 @@ test("song rows start playback only on double click", async () => {
 });
 
 test("pressing a lyric seeks the playing song", async () => {
-  const app = await open("./App.tsx", {
+  const app = await openApp( {
     width: 900,
     height: 510,
     platform: "windows",
@@ -148,7 +190,7 @@ test("lyric seek is retained before playback starts", async () => {
   if (!target) throw new Error("Deadman seek fixture has no timestamped lyrics");
 
   Music.stop();
-  const app = await open("./App.tsx", {
+  const app = await openApp( {
     width: 900,
     height: 510,
     platform: "windows",
@@ -177,7 +219,7 @@ test("playback keeps the active lyric in the visible list", async () => {
   const targetTime = Math.max(...lyricItems.filter((line) => line.time <= 90).map((line) => line.time));
   const targetIndex = lyricItems.reduce((last, line, index) => line.time === targetTime ? index : last, -1);
   const steps = new Set(lyricItems.filter((line) => line.time > 0 && line.time <= targetTime).map((line) => line.time)).size;
-  const app = await open("./App.tsx", {
+  const app = await openApp( {
     width: 900,
     height: 510,
     platform: "windows",
@@ -200,7 +242,7 @@ test("playback keeps the active lyric in the visible list", async () => {
 });
 
 test("the About page shows the NSH browser link", async () => {
-  const app = await open("./App.tsx", {
+  const app = await openApp( {
     width: 900,
     height: 510,
     platform: "windows",
@@ -214,7 +256,7 @@ test("the About page shows the NSH browser link", async () => {
 });
 
 test("clicking the progress bar seeks the playing song", async () => {
-  const app = await open("./App.tsx", {
+  const app = await openApp( {
     width: 900,
     height: 510,
     platform: "windows",
@@ -239,7 +281,7 @@ test("clicking the progress bar seeks the playing song", async () => {
 });
 
 test("dragging the progress bar does not seek", async () => {
-  const app = await open("./App.tsx", {
+  const app = await openApp( {
     width: 900,
     height: 510,
     platform: "windows",
@@ -264,7 +306,7 @@ test("dragging the progress bar does not seek", async () => {
 });
 
 test("mounted settings restyle when the system appearance changes", async () => {
-  const app = await open("./App.tsx", {
+  const app = await openApp( {
     width: 900,
     height: 510,
     platform: "windows",
@@ -272,10 +314,7 @@ test("mounted settings restyle when the system appearance changes", async () => 
   });
 
   await app.wait(100);
-  if (app.storage()["zeedle.light-theme"] !== undefined) {
-    await app.press("text:Follow system theme");
-    await app.waitUntil(() => app.storage()["zeedle.light-theme"] === undefined);
-  }
+  expect(savedConfig().follow_system_theme).toBe(true);
   await app.press("id:nav-3");
   await app.wait(250);
   const darkPlayback = app.spanStyle("text:Playback").color;
@@ -287,7 +326,7 @@ test("mounted settings restyle when the system appearance changes", async () => 
 });
 
 test("turning off system-follow pins the current appearance", async () => {
-  const app = await open("./App.tsx", {
+  const app = await openApp( {
     width: 900,
     height: 510,
     platform: "windows",
@@ -302,8 +341,9 @@ test("turning off system-follow pins the current appearance", async () => {
   await app.setColorScheme("light");
   const lightText = app.spanStyle("text:Music directory").color;
   await app.press("text:Follow system theme");
-  await app.wait(100);
-  expect(app.storage()["zeedle.light-theme"]).toBe("true");
+  await app.wait(300);
+  expect(savedConfig().follow_system_theme).toBe(false);
+  expect(savedConfig().light_ui).toBe(true);
   const pinnedText = app.spanStyle("text:Music directory").color;
   await app.setColorScheme("dark");
   await app.wait(100);
