@@ -602,13 +602,6 @@ pub fn App() -> impl IntoElement {
     let mut window_attributes = WindowAttributes::default();
     window_attributes.title_bar = Some(title_bar);
     desktop::current_window().set(window_attributes);
-    nsh_core::element::effect(move || {
-        if !startup_pending.get() {
-            set_timeout(Duration::from_millis(150), || {
-                desktop::main_window().show();
-            });
-        }
-    });
     let shortcut_options = KeyOptions {
         when: nsh_core::keymap::When::NotEditing,
         ..Default::default()
@@ -736,6 +729,7 @@ pub fn App() -> impl IntoElement {
             loading.set(false);
             if startup_pending.get() {
                 startup_pending.set(false);
+                desktop::main_window().show();
             }
         });
     };
