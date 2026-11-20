@@ -39,14 +39,21 @@ public static class NativeWindowConstraintsProbe {
   [DllImport("user32.dll", EntryPoint = "GetMonitorInfoW")] public static extern bool GetMonitorInfo(IntPtr monitor, ref WindowMonitorInfo info);
   [DllImport("user32.dll", EntryPoint = "SendMessageW")] static extern IntPtr SendMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
   [DllImport("user32.dll", EntryPoint = "SendMessageW")] static extern IntPtr SendIconMessage(IntPtr hwnd, uint message, UIntPtr wParam, IntPtr lParam);
+  [DllImport("user32.dll", EntryPoint = "GetClassLongPtrW")] static extern IntPtr GetClassLongPtr(IntPtr hwnd, int index);
   [DllImport("user32.dll")] public static extern bool PostMessageW(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
   [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern IntPtr LoadLibraryExW(string file, IntPtr reserved, uint flags);
   [DllImport("kernel32.dll", EntryPoint = "FindResourceW", CharSet = CharSet.Unicode, SetLastError = true)] static extern IntPtr FindResource(IntPtr module, IntPtr name, IntPtr type);
   [DllImport("kernel32.dll")] static extern bool FreeLibrary(IntPtr module);
 
   public static bool HasWindowIcons(IntPtr hwnd) {
-    return SendIconMessage(hwnd, 0x007F, new UIntPtr(1), IntPtr.Zero) != IntPtr.Zero
-      && SendIconMessage(hwnd, 0x007F, UIntPtr.Zero, IntPtr.Zero) != IntPtr.Zero;
+    var large = SendIconMessage(hwnd, 0x007F, new UIntPtr(1), IntPtr.Zero);
+    var small = SendIconMessage(hwnd, 0x007F, UIntPtr.Zero, IntPtr.Zero);
+    // nsh's packaged Windows runner embeds its icon as the window class icon;
+    // WM_GETICON may be empty even though the window displays the right icon.
+    var classLarge = GetClassLongPtr(hwnd, -14); // GCLP_HICON
+    var classSmall = GetClassLongPtr(hwnd, -34); // GCLP_HICONSM
+    return (large != IntPtr.Zero || classLarge != IntPtr.Zero)
+      && (small != IntPtr.Zero || classSmall != IntPtr.Zero || classLarge != IntPtr.Zero);
   }
 
   public static bool HasEmbeddedIcon(string file) {

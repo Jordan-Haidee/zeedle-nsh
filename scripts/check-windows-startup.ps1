@@ -14,6 +14,7 @@ public class StartupProbe {
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr h, System.Text.StringBuilder name, int length);
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
   [DllImport("user32.dll", EntryPoint="SendMessageW")] static extern IntPtr SendMessageRaw(IntPtr h, uint m, IntPtr w, IntPtr l);
+  [DllImport("user32.dll", EntryPoint="GetClassLongPtrW")] static extern IntPtr GetClassLongPtr(IntPtr h, int index);
   [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left, Top, Right, Bottom; }
   [StructLayout(LayoutKind.Sequential)] public struct Info { public int Size; public Rect Monitor, Work; public uint Flags; }
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out Rect r);
@@ -22,7 +23,14 @@ public class StartupProbe {
   [DllImport("user32.dll")] public static extern bool GetMonitorInfo(IntPtr h, ref Info i);
   [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
   [DllImport("user32.dll", EntryPoint="SendMessageW")] static extern IntPtr SendMessageIcon(IntPtr h, uint m, UIntPtr w, IntPtr l);
-  public static bool HasIcons(IntPtr h) { return SendMessageIcon(h,127,new UIntPtr(1),IntPtr.Zero)!=IntPtr.Zero && SendMessageIcon(h,127,UIntPtr.Zero,IntPtr.Zero)!=IntPtr.Zero; }
+  public static bool HasIcons(IntPtr h) {
+    var large=SendMessageIcon(h,127,new UIntPtr(1),IntPtr.Zero);
+    var small=SendMessageIcon(h,127,UIntPtr.Zero,IntPtr.Zero);
+    // nsh's packaged Windows runner embeds its icon as the window class icon.
+    var classLarge=GetClassLongPtr(h,-14); // GCLP_HICON
+    var classSmall=GetClassLongPtr(h,-34); // GCLP_HICONSM
+    return (large!=IntPtr.Zero || classLarge!=IntPtr.Zero) && (small!=IntPtr.Zero || classSmall!=IntPtr.Zero || classLarge!=IntPtr.Zero);
+  }
   public static Point MinimumTrack(IntPtr h) {
     var info = new MinMaxInfo(); var size=Marshal.SizeOf<MinMaxInfo>(); var memory=Marshal.AllocHGlobal(size);
     try { Marshal.StructureToPtr(info,memory,false); SendMessageRaw(h,0x0024,IntPtr.Zero,memory); return Marshal.PtrToStructure<MinMaxInfo>(memory).MinTrackSize; }
