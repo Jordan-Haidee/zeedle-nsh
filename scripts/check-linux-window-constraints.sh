@@ -25,13 +25,16 @@ trap cleanup EXIT
 window_id=
 geometry=
 hints=
+last_window_diagnostics=
 for _ in $(seq 1 150); do
   for candidate in $(xwininfo -root -tree 2>/dev/null | awk '/"Zeedle"/ { print $1 }'); do
     candidate_geometry=$(xwininfo -id "$candidate" 2>/dev/null) || continue
     candidate_hints=$(xprop -id "$candidate" WM_NORMAL_HINTS 2>/dev/null) || continue
+    map_state=$(awk '/^[[:space:]]*Map State:/ { print $3; exit }' <<<"$candidate_geometry")
     width=$(awk '/^[[:space:]]*Width:/ { print $2; exit }' <<<"$candidate_geometry")
     height=$(awk '/^[[:space:]]*Height:/ { print $2; exit }' <<<"$candidate_geometry")
-    if grep -Fq "minimum size: 850 by 500" <<<"$candidate_hints" && [[ "$width" == 900 && "$height" == 510 ]]; then
+    last_window_diagnostics="window=$candidate map_state=$map_state client=${width}x${height}; $candidate_hints"
+    if [[ "$map_state" == IsViewable ]] && grep -Fq "minimum size: 850 by 500" <<<"$candidate_hints" && [[ "$width" == 900 && "$height" == 510 ]]; then
       window_id=$candidate
       geometry=$candidate_geometry
       hints=$candidate_hints
@@ -50,6 +53,7 @@ done
 if [[ -z "$window_id" ]]; then
   echo "X11 windows after startup:" >&2
   xwininfo -root -tree >&2 || true
+  echo "$last_window_diagnostics" >&2
   ps -o pid,stat,cmd -p "$app_pid" >&2 || true
   cat "target/${ui}-window-constraints.log" >&2
   echo "$ui did not open a visible X11 window" >&2
