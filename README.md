@@ -36,7 +36,7 @@ nsh run
 
 The app directory starts the TSX UI in `App.tsx` by default. On Windows, use `nsh run --window-size 900x510` to set the initial window size.
 
-To temporarily run the Rust UI, use `pwsh -File scripts/run-rust-ui.ps1`. It uses the Rust UI's 900x510 startup fallback, restores `nsh.json` and `Cargo.toml` when NSH exits, and accepts NSH run options supported by Rust roots, such as `--verbose`.
+To temporarily run the Rust UI, use `pwsh -File scripts/run-rust-ui.ps1`. It restores `nsh.json` and `Cargo.toml` when NSH exits, and accepts NSH run options supported by Rust roots, such as `--verbose`.
 
 To check the app and run its tests:
 
@@ -58,10 +58,10 @@ nsh package --target linux
 nsh package --target macos
 ```
 
-On Windows, use the packaging script to include Zeedle's centered startup launcher and icon:
+On Windows, NSH's package command reads Zeedle's window and icon settings from `nsh.json`:
 
 ```powershell
-powershell -File scripts/package-windows.ps1
+nsh package App.tsx --target windows
 ```
 
 The portable files attached to each GitHub Release are named `Zeedle-<tag>-windows-x86_64.zip`, `Zeedle-<tag>-linux-x86_64.tar.gz` and `Zeedle-<tag>-macos-aarch64.zip`; `<tag>` may be `0.2.2` or `v0.2.2`. Linux requires GTK 4.14 and WebKitGTK 6.0; macOS requires version 14 or newer. The macOS archive contains an ad hoc signed `.app` bundle. Windows and Linux packages are directories archived in their platform's standard format.

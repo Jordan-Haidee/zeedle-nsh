@@ -441,7 +441,7 @@ export function App() {
     Music.setSpectrumEnabled(showSpectrum());
     await refreshSongs(directory());
   })().catch((error) => playerError.set(String(error))).finally(() => {
-    setTimeout(() => Music.finishStartup?.(), 150);
+    setTimeout(() => win.show(), 150);
   });
 
   function saveConfig() {

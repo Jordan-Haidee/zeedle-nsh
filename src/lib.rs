@@ -25,12 +25,8 @@ use serde::{Deserialize, Serialize};
 mod config;
 mod logger;
 mod spectrum;
-#[cfg(windows)]
-mod startup;
 #[cfg(feature = "rust-ui")]
 pub mod ui;
-#[cfg(feature = "rust-ui")]
-mod window_constraints;
 use spectrum::{SpectrumChunk, TapSource, default_spectrum, try_start_spectrum_worker};
 
 #[native_module("zeedle-nsh/native")]
@@ -38,8 +34,6 @@ fn native(registry: &mut Registry) {
     logger::init_default_logger(None);
     registry.module::<Music>();
     registry.module::<AppConfig>();
-    #[cfg(feature = "rust-ui")]
-    registry.module::<WindowConstraints>();
     #[cfg(feature = "rust-ui")]
     registry.register::<ui::App>().assets(assets!());
 }
@@ -64,31 +58,6 @@ impl AppConfig {
             .save()
             .map_or_else(|error| error.to_string(), |_| String::new())
     }
-}
-
-/// Set the app window's initial and minimum content sizes on its native host.
-#[cfg(feature = "rust-ui")]
-#[module]
-pub struct WindowConstraints;
-
-#[cfg(feature = "rust-ui")]
-#[module]
-impl WindowConstraints {
-    /// Enforce the app's native minimum content size during live resizing.
-    pub fn set_minimum_size(min_width: f32, min_height: f32) {
-        window_constraints::set_minimum_size(min_width, min_height);
-    }
-
-    /// Configure the initial and minimum content sizes of the native window.
-    pub fn configure(width: f32, height: f32, min_width: f32, min_height: f32) {
-        window_constraints::configure(width, height, min_width, min_height);
-    }
-}
-
-/// Connect the packaged launcher's initially hidden native window.
-#[cfg(windows)]
-pub fn set_startup_window(handle: isize) {
-    startup::set_window(handle);
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -538,11 +507,6 @@ impl Music {
             "data:image/svg+xml;base64,{}",
             STANDARD.encode(svg.replace("currentColor", &color))
         )
-    }
-    /// Reveal the centered packaged window once the initial library has loaded.
-    pub fn finish_startup() {
-        #[cfg(windows)]
-        startup::ready();
     }
     /// Scan one directory for supported music files and read their Lofty tags.
     pub async fn scan(directory: String) -> String {

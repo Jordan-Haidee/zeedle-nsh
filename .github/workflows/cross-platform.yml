@@ -80,9 +80,6 @@ jobs:
       - name: Check TSX UI
         run: nsh check -v
 
-      - name: Test Rust package startup configuration
-        run: python tests/test_rust_package_main.py
-
       - name: Render TSX UI
         if: runner.os != 'Linux'
         run: nsh test tests/platform-render.test.tsx --target ${{ matrix.target }}
@@ -111,7 +108,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          ./scripts/package-windows.ps1
+          nsh package App.tsx --target windows
           Move-Item .nsh/out/Zeedle.zip .nsh/out/Zeedle-tsxui.zip
 
       - name: Package Windows Rust UI
@@ -119,7 +116,6 @@ jobs:
         shell: pwsh
         run: |
           python scripts/with-rust-root.py nsh package --target windows --out .nsh/out/rustui
-          python scripts/rust_package_main.py --target windows --install
           ./scripts/check-windows-window-constraints.ps1 -Ui rustui
           Move-Item .nsh/out/rustui/Zeedle.zip .nsh/out/Zeedle-rustui.zip
 
@@ -136,8 +132,6 @@ jobs:
         run: |
           xvfb-run -a nsh package --target linux --out .nsh/out/tsxui
           xvfb-run -a python scripts/with-rust-root.py nsh package --target linux --out .nsh/out/rustui
-          python scripts/rust_package_main.py --target linux --ui tsxui --install
-          python scripts/rust_package_main.py --target linux --install
           xvfb-run -a bash scripts/check-linux-window-constraints.sh tsxui
           xvfb-run -a bash scripts/check-linux-window-constraints.sh rustui
 
@@ -147,7 +141,6 @@ jobs:
         run: |
           nsh package --target macos --out .nsh/out/tsxui
           python scripts/with-rust-root.py nsh package --target macos --out .nsh/out/rustui
-          python scripts/rust_package_main.py --target macos --install
 
       - name: Archive macOS TSX UI
         if: runner.os == 'macOS'

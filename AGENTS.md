@@ -2,7 +2,7 @@
 
 ## Project Structure
 
-`App.tsx` contains the NSH interface and player state; `App.test.tsx` covers app behavior. Native Rust audio and metadata code lives in `src/lib.rs`, with spectrum processing in `src/spectrum.rs` and Windows startup code in `src/startup.rs`. `icons.tsx` maps names to SVGs under `assets/icons/`; `theme.json` defines theme tokens. Cross-platform UI tests are in `tests/`, packaging and startup scripts in `scripts/`, and CI workflows in `.github/workflows/`. Screenshots used by the README live in `docs/screenshots/`.
+`App.tsx` contains the NSH interface and player state; `App.test.tsx` covers app behavior. Native Rust audio and metadata code lives in `src/lib.rs`, with spectrum processing in `src/spectrum.rs`. `icons.tsx` maps names to SVGs under `assets/icons/`; `theme.json` defines theme tokens. Cross-platform UI tests are in `tests/`, platform validation scripts in `scripts/`, and CI workflows in `.github/workflows/`. Screenshots used by the README live in `docs/screenshots/`.
 
 ## Build, Test, and Package
 
@@ -10,7 +10,7 @@
 - `nsh check -v` checks the TSX app and Rust crate; `nsh test App.test.tsx` runs app behavior tests.
 - `cargo test --locked` runs Rust tests; `cargo fmt --check` checks Rust formatting.
 - `nsh test tests/platform-render.test.tsx --target windows` renders core screens on Windows. Replace the target with `linux` or `macos` for those hosts.
-- `powershell -File scripts/package-windows.ps1` creates the Windows portable package. Use `nsh package --target linux` or `nsh package --target macos` on the corresponding platform.
+- `nsh package App.tsx --target windows` creates the Windows portable package. Use `nsh package --target linux` or `nsh package --target macos` on the corresponding platform.
 
 App tests use songs and lyric metadata from the default Music folder. The README lists the expected fixture tracks. Screenshot tests can update files under `docs/screenshots/`; review those image changes before including them.
 
