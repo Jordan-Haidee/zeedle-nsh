@@ -1,15 +1,53 @@
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.rust_package_main import stage_windows_icons
+from scripts.rust_package_main import install, stage_windows_icons
 
 
 class RustPackageMainTests(unittest.TestCase):
+    def test_rust_runner_enables_optional_ui_feature_on_the_app_dependency(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            app_source = root / ".nsh/rust/linux-app"
+            app_source.mkdir(parents=True)
+            manifest = app_source / "Cargo.toml"
+            manifest.write_text(
+                '[package]\nname = "zeedle-runner"\nversion = "0.0.0"\n\n'
+                '[dependencies]\nnsh-linux-app = "=0.6.1"\n'
+                'app_nsh_app_zeedle_nsh = { package = "nsh-app-zeedle-nsh", path = "../.." }\n\n'
+                '[features]\ndefault = ["svg"]\nsvg = ["nsh-linux-app/svg"]\n',
+                encoding="utf-8",
+            )
+            (root / ".nsh/out/rustui/Zeedle").mkdir(parents=True)
+            binary = root / "target/release/zeedle-runner"
+            binary.parent.mkdir(parents=True)
+            binary.write_bytes(b"test runner")
+
+            previous_directory = Path.cwd()
+            try:
+                os.chdir(root)
+                with patch("scripts.rust_package_main.subprocess.run") as run:
+                    run.return_value.returncode = 0
+                    install("linux")
+            finally:
+                os.chdir(previous_directory)
+
+            app_dependency = next(
+                line for line in manifest.read_text(encoding="utf-8").splitlines()
+                if line.startswith("app_nsh_app_zeedle_nsh = ")
+            )
+            self.assertIn('features = ["rust-ui"]', app_dependency)
+            generated_manifest = manifest.read_text(encoding="utf-8")
+            self.assertNotIn("[features]", generated_manifest)
+            self.assertNotIn("nsh-linux-app/", generated_manifest)
+
     def test_windows_runner_stages_icons_for_the_exe_and_window(self):
         repo_root = Path(__file__).resolve().parents[1]
         with tempfile.TemporaryDirectory() as temporary_directory:

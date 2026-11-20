@@ -107,6 +107,29 @@ fn main() -> std::process::ExitCode {
 '''
 
 
+def enable_rust_ui_dependency(cargo_toml: str) -> str:
+    pattern = re.compile(r'^(app_nsh_app_zeedle_nsh\s*=\s*\{)([^}\n]*)(\})$', re.M)
+    match = pattern.search(cargo_toml)
+    if match is None:
+        raise RuntimeError("No app crate dependency in the generated runner manifest")
+
+    fields = match.group(2)
+    feature_list = re.search(r'\bfeatures\s*=\s*\[([^\]]*)\]', fields)
+    if feature_list is not None:
+        features = [feature.strip() for feature in feature_list.group(1).split(",") if feature.strip()]
+        if '"rust-ui"' not in features and "'rust-ui'" not in features:
+            features.append('"rust-ui"')
+            fields = (
+                fields[:feature_list.start(1)]
+                + ", ".join(features)
+                + fields[feature_list.end(1):]
+            )
+    else:
+        fields = fields.rstrip() + ', features = ["rust-ui"]'
+
+    return cargo_toml[:match.start(2)] + fields + cargo_toml[match.end(2):]
+
+
 def install(target: str, ui: str = "rustui") -> None:
     if ui == "tsxui" and target != "linux":
         raise ValueError("the custom TSX runner is only needed for Linux")
@@ -118,6 +141,9 @@ def install(target: str, ui: str = "rustui") -> None:
     app_crate = f"nsh-{target}-app"
     cargo_toml = manifest.read_text(encoding="utf-8")
     cargo_toml = re.sub(rf"^{re.escape(app_crate)}\s*=.*\n", "", cargo_toml, flags=re.M)
+    cargo_toml = re.sub(r"(?ms)^\[features\]\n.*?(?=^\[|\Z)", "", cargo_toml)
+    if ui == "rustui":
+        cargo_toml = enable_rust_ui_dependency(cargo_toml)
     if target == "windows":
         if "winresource" not in cargo_toml:
             cargo_toml = cargo_toml.rstrip() + "\n\n[build-dependencies]\nwinresource = '=0.1.23'\n"

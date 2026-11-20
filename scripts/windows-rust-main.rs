@@ -10,8 +10,7 @@ use nsh_platform_windows::windows::Win32::{
     UI::HiDpi::{DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, SetProcessDpiAwarenessContext},
     UI::Shell::SetCurrentProcessExplicitAppUserModelID,
     UI::WindowsAndMessaging::{
-        ICON_BIG, ICON_SMALL, IMAGE_ICON, LR_LOADFROMFILE, LoadImageW, SendMessageW, WM_SETICON,
-        *,
+        ICON_BIG, ICON_SMALL, IMAGE_ICON, LR_LOADFROMFILE, LoadImageW, SendMessageW, WM_SETICON, *,
     },
 };
 use nsh_platform_windows::windows::core::{HSTRING, PCWSTR};

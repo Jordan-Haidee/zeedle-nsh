@@ -8,9 +8,7 @@ use nsh_platform_windows::windows::Win32::{
         GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromWindow, UpdateWindow,
     },
     System::Ole::{OleInitialize, OleUninitialize},
-    UI::HiDpi::{
-        DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, SetProcessDpiAwarenessContext,
-    },
+    UI::HiDpi::{DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, SetProcessDpiAwarenessContext},
     UI::WindowsAndMessaging::{
         ICON_BIG, ICON_SMALL, IMAGE_ICON, LR_LOADFROMFILE, LoadImageW, SendMessageW, WM_SETICON, *,
     },

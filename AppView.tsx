@@ -50,6 +50,11 @@ function sameSongPath(left: string | null | undefined, right: string | null | un
 export function App() {
   const config = JSON.parse(AppConfig.load()) as AppConfigValue;
   const win = currentWindow();
+  win.set({
+    title: "Zeedle",
+    titleBar: { style: "hidden", height: 40 },
+    minSize: { width: 850, height: 500 },
+  });
   const page = signal<Page>(Math.max(0, Math.min(4, config.current_page)) as Page);
   const expanded = signal(config.sidebar_expanded);
   const light = () => colorScheme() === "light";

@@ -36,7 +36,7 @@ nsh run
 
 The app directory starts the TSX UI in `App.tsx` by default. On Windows, use `nsh run --window-size 900x510` to set the initial window size.
 
-To temporarily run the Rust UI, use `pwsh -File scripts/run-rust-ui.ps1`. The script uses the Slint window size, restores `nsh.json` when NSH exits, and accepts NSH options such as `--window-size 1000x600`.
+To temporarily run the Rust UI, use `pwsh -File scripts/run-rust-ui.ps1`. It uses the Rust UI's 900x510 startup fallback, restores `nsh.json` and `Cargo.toml` when NSH exits, and accepts NSH run options supported by Rust roots, such as `--verbose`.
 
 To check the app and run its tests:
 
