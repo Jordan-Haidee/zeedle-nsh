@@ -1103,4 +1103,4 @@ export function App() {
       ) : null}
     </View>
   );
-}\n
+}

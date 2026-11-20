@@ -6,8 +6,8 @@ use std::{
 
 use nsh_base::{input, theme};
 use nsh_core::{
-    EllipsizeMode, LayoutAnimation, LayoutCurve, LayoutTransition,
-    desktop::TitleBarStyle,
+    LayoutAnimation, LayoutCurve, LayoutTransition,
+    desktop::{TitleBarOptions, TitleBarStyle, WindowAttributes},
     element::{IntoElement, desktop},
     platform::Appearance,
     prelude::*,
@@ -72,7 +72,7 @@ struct UiState {
     lyric_panel_height: Signal<f32>,
 }
 
-const COVER: nsh_core::element::FileAsset = asset!("cover.svg");
+const COVER: nsh_core::element::ImageAsset = asset!("cover.svg");
 
 fn play_mode_from_config(mode: ConfigPlayMode) -> &'static str {
     match mode {
@@ -155,9 +155,7 @@ fn save_config_snapshot(app: UiState, expanded: Signal<bool>) {
 }
 
 fn text(content: impl IntoReactive<SharedString>) -> Text {
-    nsh_core::element::text(content)
-        .number_of_lines(1)
-        .ellipsize_mode(EllipsizeMode::Tail)
+    nsh_core::element::text(content).number_of_lines(1)
 }
 
 fn color_token(name: &'static str) -> AdaptiveColor {
@@ -461,7 +459,7 @@ fn localized(language: &str, text: &str) -> String {
 #[component]
 pub fn App() -> impl IntoElement {
     let config = Config::load();
-    let window_size = nsh_core::element::ambient::window();
+    let window_size = window();
     let (initial_width, initial_height) =
         initial_window_dimensions(window_size.width.0, window_size.height.0);
     let page = signal(config.current_page.clamp(0, 4) as u8);
@@ -470,7 +468,7 @@ pub fn App() -> impl IntoElement {
     let songs = signal(Vec::<SongInfo>::new());
     let current = signal(None::<SongInfo>);
     let lyrics = signal(Vec::<LyricItem>::new());
-    let art = signal(COVER.uri.to_string());
+    let art = signal(COVER.url.to_string());
     let query = signal(String::new());
     let search_results = signal(Vec::<SongInfo>::new());
     let loading = signal(true);
@@ -506,7 +504,7 @@ pub fn App() -> impl IntoElement {
     let edit_album = signal(String::new());
     let edit_cover_path = signal(String::new());
     let edit_cover_name = signal(String::new());
-    let edit_cover_preview = signal(COVER.uri.to_string());
+    let edit_cover_preview = signal(COVER.url.to_string());
     let edit_lyrics_path = signal(String::new());
     let edit_lyrics_name = signal(String::new());
     let edit_lyrics_preview = signal(String::new());
@@ -578,8 +576,7 @@ pub fn App() -> impl IntoElement {
         track_width,
         lyric_panel_height,
     };
-    let pending_save: Rc<RefCell<Option<nsh_core::element::ambient::Spawned<()>>>> =
-        Rc::new(RefCell::new(None));
+    let pending_save: Rc<RefCell<Option<Spawned<()>>>> = Rc::new(RefCell::new(None));
     let first_save_effect_run = Rc::new(Cell::new(true));
     nsh_core::element::effect({
         let pending_save = Rc::clone(&pending_save);
@@ -607,23 +604,27 @@ pub fn App() -> impl IntoElement {
                 previous.cancel();
             }
             let pending_save = Rc::clone(&pending_save);
-            *pending_save.borrow_mut() = Some(nsh_core::element::ambient::set_timeout(
-                Duration::from_millis(250),
-                move || save_config_snapshot(app, expanded),
-            ));
+            *pending_save.borrow_mut() = Some(set_timeout(Duration::from_millis(250), move || {
+                save_config_snapshot(app, expanded)
+            }));
         }
     });
     nsh_core::element::cleanup(move || save_config_snapshot(app, expanded));
 
-    desktop::set_title_bar(TitleBarStyle::Hidden, Some(px(40.0)));
+    let mut title_bar = TitleBarOptions::default();
+    title_bar.style = TitleBarStyle::Hidden;
+    title_bar.height = Some(px(40.0));
+    let mut window_attributes = WindowAttributes::default();
+    window_attributes.title_bar = Some(title_bar);
+    desktop::current_window().set(window_attributes);
     crate::window_constraints::set_minimum_size(850.0, 500.0);
     #[cfg(not(target_os = "linux"))]
-    nsh_core::element::ambient::set_timeout(Duration::from_millis(150), move || {
+    set_timeout(Duration::from_millis(150), move || {
         crate::window_constraints::configure(initial_width, initial_height, 850.0, 500.0);
     });
     nsh_core::element::effect(move || {
         if !startup_pending.get() {
-            nsh_core::element::ambient::set_timeout(Duration::from_millis(150), || {
+            set_timeout(Duration::from_millis(150), || {
                 Music::finish_startup();
             });
         }
@@ -667,7 +668,7 @@ pub fn App() -> impl IntoElement {
                     songs.set(found.clone());
                     search_results.set(search_songs(&found, &query.get()));
                     let gallery_offset = app.gallery_viewport_y.get();
-                    nsh_core::element::ambient::set_timeout(Duration::from_millis(50), move || {
+                    set_timeout(Duration::from_millis(50), move || {
                         app.gallery_scroll.scroll_to(
                             Point {
                                 x: px(0.0),
@@ -680,7 +681,7 @@ pub fn App() -> impl IntoElement {
                         Music::stop();
                         current.set(None);
                         lyrics.set(Vec::new());
-                        art.set(COVER.uri.to_string());
+                        art.set(COVER.url.to_string());
                         position.set(0.0);
                         duration.set(0.0);
                     } else {
@@ -724,7 +725,7 @@ pub fn App() -> impl IntoElement {
                                     lyrics.set(found_lyrics);
                                 }
                                 art.set(if cover_uri.is_empty() {
-                                    COVER.uri.to_string()
+                                    COVER.url.to_string()
                                 } else {
                                     cover_uri
                                 });
@@ -743,7 +744,7 @@ pub fn App() -> impl IntoElement {
                                 lyrics.set(found_lyrics);
                             }
                             art.set(if cover_uri.is_empty() {
-                                COVER.uri.to_string()
+                                COVER.url.to_string()
                             } else {
                                 cover_uri
                             });
@@ -760,9 +761,9 @@ pub fn App() -> impl IntoElement {
     };
 
     if config.follow_system_theme {
-        nsh_core::element::ambient::set_color_scheme(Appearance::System);
+        set_color_scheme(Appearance::System);
     } else {
-        nsh_core::element::ambient::set_color_scheme(if config.light_ui {
+        set_color_scheme(if config.light_ui {
             Appearance::Light
         } else {
             Appearance::Dark
@@ -941,7 +942,7 @@ pub fn App() -> impl IntoElement {
                 .border_color(move || color_token("border"))
                 .window_drag(true)
                 .child(view().w(move || desktop::title_bar().left))
-                .child(image(COVER.uri).size(px(18.0)))
+                .child(image(COVER.url).size(px(18.0)))
                 .child(
                     text("Zeedle")
                         .ml(px(6.0))
@@ -961,7 +962,7 @@ pub fn App() -> impl IntoElement {
                             if !follow_system.get() {
                                 let next = !light.get();
                                 light.set(next);
-                                nsh_core::element::ambient::set_color_scheme(if next {
+                                set_color_scheme(if next {
                                     Appearance::Light
                                 } else {
                                     Appearance::Dark
@@ -976,10 +977,8 @@ pub fn App() -> impl IntoElement {
                             }
                         })
                         .child(
-                            when(nsh_core::element::ambient::dark, || {
-                                svg_icon("moon", 18.0, "text-secondary")
-                            })
-                            .otherwise(|| svg_icon("sun", 18.0, "text-secondary")),
+                            when(dark, || svg_icon("moon", 18.0, "text-secondary"))
+                                .otherwise(|| svg_icon("sun", 18.0, "text-secondary")),
                         ),
                 )
                 .child(view().w(move || desktop::title_bar().right)),
@@ -1201,7 +1200,7 @@ fn svg_icon(name: &'static str, size: f32, tint: &'static str) -> impl IntoEleme
         "x" => asset!("icons/x.svg"),
         _ => asset!("icons/search.svg"),
     };
-    image(source.uri)
+    image(source.url)
         .size(px(size))
         .tint_color(move || color_token(tint))
 }
@@ -1212,7 +1211,7 @@ fn transport_icon(name: &'static str, tint: &'static str) -> impl IntoElement {
         "skip-forward" => "skipForward",
         other => other,
     };
-    let color = move || nsh_core::element::ambient::color(color_token(tint)).to_hex();
+    let color = move || color(color_token(tint)).to_hex();
     view()
         .absolute()
         .left(px(5.0))
@@ -1224,7 +1223,7 @@ fn transport_icon(name: &'static str, tint: &'static str) -> impl IntoElement {
         .child(
             image(move || Music::transport_icon(name.to_string(), color()))
                 .size(px(26.0))
-                .resize_mode(ResizeMode::Contain),
+                .object_fit(ResizeMode::Contain),
         )
 }
 
@@ -1256,7 +1255,7 @@ fn play_track(song: SongInfo, add_history: bool, app: UiState) {
                 app.lyrics.set(found);
             }
             app.art.set(if cover_uri.is_empty() {
-                COVER.uri.to_string()
+                COVER.url.to_string()
             } else {
                 cover_uri
             });
@@ -1357,7 +1356,7 @@ fn begin_edit(app: UiState, song: SongInfo) {
     app.edit_album.set(String::new());
     app.edit_cover_path.set(String::new());
     app.edit_cover_name.set(String::new());
-    app.edit_cover_preview.set(COVER.uri.to_string());
+    app.edit_cover_preview.set(COVER.url.to_string());
     app.edit_lyrics_path.set(String::new());
     app.edit_lyrics_name.set(String::new());
     app.edit_lyrics_preview.set(String::new());
@@ -1391,7 +1390,7 @@ fn begin_edit(app: UiState, song: SongInfo) {
                 metadata["cover"]
                     .as_str()
                     .filter(|value| !value.is_empty())
-                    .unwrap_or(COVER.uri)
+                    .unwrap_or(COVER.url)
                     .to_string(),
             );
             app.edit_cover_name.set(
@@ -2587,19 +2586,15 @@ fn settings_page(app: UiState, refresh: impl Fn(String) + Copy + 'static) -> imp
                                     let next = !app.follow_system.get();
                                     app.follow_system.set(next);
                                     if next {
-                                        nsh_core::element::ambient::set_color_scheme(
-                                            Appearance::System,
-                                        );
+                                        set_color_scheme(Appearance::System);
                                     } else {
-                                        let current_light = !nsh_core::element::ambient::dark();
+                                        let current_light = !dark();
                                         app.light.set(current_light);
-                                        nsh_core::element::ambient::set_color_scheme(
-                                            if app.light.get() {
-                                                Appearance::Light
-                                            } else {
-                                                Appearance::Dark
-                                            },
-                                        );
+                                        set_color_scheme(if app.light.get() {
+                                            Appearance::Light
+                                        } else {
+                                            Appearance::Dark
+                                        });
                                     }
                                 }))
                                 .child(
@@ -2610,19 +2605,15 @@ fn settings_page(app: UiState, refresh: impl Fn(String) + Copy + 'static) -> imp
                                         let next = !app.follow_system.get();
                                         app.follow_system.set(next);
                                         if next {
-                                            nsh_core::element::ambient::set_color_scheme(
-                                                Appearance::System,
-                                            );
+                                            set_color_scheme(Appearance::System);
                                         } else {
-                                            let current_light = !nsh_core::element::ambient::dark();
+                                            let current_light = !dark();
                                             app.light.set(current_light);
-                                            nsh_core::element::ambient::set_color_scheme(
-                                                if app.light.get() {
-                                                    Appearance::Light
-                                                } else {
-                                                    Appearance::Dark
-                                                },
-                                            );
+                                            set_color_scheme(if app.light.get() {
+                                                Appearance::Light
+                                            } else {
+                                                Appearance::Dark
+                                            });
                                         }
                                     })
                                     .text_size(px(13.0))
@@ -2723,7 +2714,7 @@ fn about_page(app: UiState) -> impl IntoElement {
         .justify_center()
         .gap(px(10.0))
         .bg(move || color_token("page"))
-        .child(image(COVER.uri).size(px(120.0)))
+        .child(image(COVER.url).size(px(120.0)))
         .child(
             text(move || {
                 format!(
@@ -3060,8 +3051,8 @@ fn player_panel(app: UiState) -> impl IntoElement {
                         .flex_row()
                         .items_center()
                         .justify_center()
-                        .on_hover_in(move || volume_hovered.set(true))
-                        .on_hover_out(move || volume_hovered.set(false))
+                        .on_mouse_enter(move |_: &MouseEvent| volume_hovered.set(true))
+                        .on_mouse_leave(move |_: &MouseEvent| volume_hovered.set(false))
                         .child(
                             when(volume_hovered, move || {
                                 view()
