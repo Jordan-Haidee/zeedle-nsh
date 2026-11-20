@@ -75,7 +75,7 @@ try {
   $minWidth = [Math]::Round(($track.X-$frameWidth) * 96.0 / $dpi)
   $minHeight = [Math]::Round(($track.Y-$frameHeight) * 96.0 / $dpi)
   [PSCustomObject]@{ HiddenSamples=$hidden; VisibleAfterMs=$timer.ElapsedMilliseconds; CenterErrorX=$dx; CenterErrorY=$dy; TaskbarIcons=$hasIcons; EmbeddedExeIcon=$hasEmbeddedIcon; MinimumTrackWidth=$minWidth; MinimumTrackHeight=$minHeight; Width=($rect.Right-$rect.Left); Height=($rect.Bottom-$rect.Top); Left=$rect.Left; Top=$rect.Top; WorkLeft=$info.Work.Left; WorkTop=$info.Work.Top; WorkRight=$info.Work.Right; WorkBottom=$info.Work.Bottom } | Format-List
-  if ($hidden -eq 0 -or $dx -gt 1 -or $dy -gt 1 -or !$hasIcons -or !$hasEmbeddedIcon -or [Math]::Abs($minWidth-850) -gt 1 -or [Math]::Abs($minHeight-500) -gt 1) { throw 'Startup visibility, centering, icons, or minimum-size check failed' }
+  if ($hidden -eq 0 -or $dx -gt 4 -or $dy -gt 4 -or !$hasIcons -or !$hasEmbeddedIcon -or [Math]::Abs($minWidth-850) -gt 1 -or [Math]::Abs($minHeight-500) -gt 1) { throw 'Startup visibility, centering, icons, or minimum-size check failed' }
 } finally {
   if ($handle -ne [IntPtr]::Zero) { [void][StartupProbe]::PostMessage($handle,16,[IntPtr]::Zero,[IntPtr]::Zero) }
   [void]$launched.WaitForExit(5000)

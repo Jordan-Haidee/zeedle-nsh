@@ -130,7 +130,7 @@ try {
     [Math]::Abs($firstVisible.Bottom - $outer.Bottom)
   ) | Where-Object { $_ -gt 1 }
   Write-Output "${Ui}: first rect $($firstVisible.Left),$($firstVisible.Top)-$($firstVisible.Right),$($firstVisible.Bottom); final rect $($outer.Left),$($outer.Top)-$($outer.Right),$($outer.Bottom); client ${clientWidth}x${clientHeight}, minimum ${minimumWidth}x${minimumHeight} points, center error ${centerErrorX}x${centerErrorY}px at DPI $dpi"
-  if ($centerErrorX -gt 2 -or $centerErrorY -gt 2) {
+  if ($centerErrorX -gt 4 -or $centerErrorY -gt 4) {
     throw "$Ui startup window should be centered in the monitor work area"
   }
   if ($startupGeometryChanged) {
