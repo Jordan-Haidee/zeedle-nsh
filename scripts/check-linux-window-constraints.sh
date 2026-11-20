@@ -2,6 +2,9 @@
 set -euo pipefail
 
 ui=${1:?usage: check-linux-window-constraints.sh tsxui|rustui}
+# GTK includes its X11 frame allowance in WM_NORMAL_HINTS; nsh.json's
+# 850x500 content minimum is reported to the window manager as 860x510.
+expected_minimum_hint="minimum size: 860 by 510"
 case "$ui" in
   tsxui) executable=.nsh/out/tsxui/Zeedle/Zeedle ;;
   rustui) executable=.nsh/out/rustui/Zeedle/Zeedle ;;
@@ -34,7 +37,7 @@ for _ in $(seq 1 150); do
     width=$(awk '/^[[:space:]]*Width:/ { print $2; exit }' <<<"$candidate_geometry")
     height=$(awk '/^[[:space:]]*Height:/ { print $2; exit }' <<<"$candidate_geometry")
     last_window_diagnostics="window=$candidate map_state=$map_state client=${width}x${height}; $candidate_hints"
-    if [[ "$map_state" == IsViewable ]] && grep -Fq "minimum size: 850 by 500" <<<"$candidate_hints" && [[ "$width" == 900 && "$height" == 510 ]]; then
+    if [[ "$map_state" == IsViewable ]] && grep -Fq "$expected_minimum_hint" <<<"$candidate_hints" && [[ "$width" == 900 && "$height" == 510 ]]; then
       window_id=$candidate
       geometry=$candidate_geometry
       hints=$candidate_hints
@@ -66,7 +69,7 @@ printf '%s: client %sx%s; %s\n' "$ui" "$width" "$height" "$hints"
   echo "$ui startup client size should be 900x510" >&2
   exit 1
 }
-[[ "$hints" == *"minimum size: 850 by 500"* ]] || {
-  echo "$ui native minimum should be 850x500" >&2
+[[ "$hints" == *"$expected_minimum_hint"* ]] || {
+  echo "$ui X11 minimum hint should be 860x510 for its 850x500 content minimum" >&2
   exit 1
 }
