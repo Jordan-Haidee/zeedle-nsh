@@ -48,6 +48,8 @@ jobs:
             libdbus-1-dev \
             libfontconfig1-dev \
             libfreetype6-dev \
+            libgstreamer1.0-dev \
+            libgstreamer-plugins-base1.0-dev \
             libgtk-4-dev \
             libxkbcommon-dev \
             libwebkitgtk-6.0-dev \
