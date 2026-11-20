@@ -55,21 +55,38 @@ jobs:
             pkg-config \
             xvfb
 
-      - name: Install NSH on Windows x64
+      - name: Install NSH 0.6.1 on Windows x64
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $env:NSH_VERSION = 'v0.3.0'
+          $env:NSH_VERSION = 'v0.6.1'
           irm https://nsh.dev/install.ps1 | iex
           "$env:LOCALAPPDATA\nsh\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 
-      - name: Install NSH on Linux and macOS
+      - name: Install NSH 0.6.1 on Linux and macOS
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          export NSH_VERSION=v0.3.0
+          export NSH_VERSION=v0.6.1
           curl -fsSL https://nsh.dev/install.sh | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install Inno Setup 6
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $innoRoots = @(
+            (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6'),
+            (Join-Path $env:ProgramFiles 'Inno Setup 6')
+          )
+          $innoRoot = $innoRoots | Where-Object { Test-Path (Join-Path $_ 'ISCC.exe') } | Select-Object -First 1
+          if (-not $innoRoot) {
+            winget install --id JRSoftware.InnoSetup --exact --silent --accept-package-agreements --accept-source-agreements
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation with winget failed' }
+            $innoRoot = $innoRoots | Where-Object { Test-Path (Join-Path $_ 'ISCC.exe') } | Select-Object -First 1
+          }
+          if (-not $innoRoot) { throw 'Inno Setup 6 ISCC.exe was not found' }
+          $innoRoot | Out-File -FilePath $env:GITHUB_PATH -Append
 
       - name: Build
         run: cargo build --locked
@@ -109,7 +126,10 @@ jobs:
         shell: pwsh
         run: |
           nsh package App.tsx --target windows
-          Move-Item .nsh/out/Zeedle.zip .nsh/out/Zeedle-tsxui.zip
+          $installer = '.nsh/out/Zeedle-setup.exe'
+          if (!(Test-Path -LiteralPath $installer)) { throw "Missing NSH installer: $installer" }
+          New-Item -ItemType Directory -Force -Path .nsh/out/artifacts | Out-Null
+          Copy-Item -LiteralPath $installer -Destination .nsh/out/artifacts/Zeedle-tsxui-windows-x86_64-setup.exe
 
       - name: Package Windows Rust UI
         if: runner.os == 'Windows'
@@ -117,7 +137,10 @@ jobs:
         run: |
           python scripts/with-rust-root.py nsh package --target windows --out .nsh/out/rustui
           ./scripts/check-windows-window-constraints.ps1 -Ui rustui
-          Move-Item .nsh/out/rustui/Zeedle.zip .nsh/out/Zeedle-rustui.zip
+          $installer = '.nsh/out/rustui/Zeedle-setup.exe'
+          if (!(Test-Path -LiteralPath $installer)) { throw "Missing NSH installer: $installer" }
+          New-Item -ItemType Directory -Force -Path .nsh/out/artifacts | Out-Null
+          Copy-Item -LiteralPath $installer -Destination .nsh/out/artifacts/Zeedle-rustui-windows-x86_64-setup.exe
 
       - name: Verify Windows TSX window constraints
         if: runner.os == 'Windows'
@@ -134,6 +157,9 @@ jobs:
           xvfb-run -a python scripts/with-rust-root.py nsh package --target linux --out .nsh/out/rustui
           xvfb-run -a bash scripts/check-linux-window-constraints.sh tsxui
           xvfb-run -a bash scripts/check-linux-window-constraints.sh rustui
+          mkdir -p .nsh/out/artifacts
+          cp .nsh/out/tsxui/Zeedle.tar.gz .nsh/out/artifacts/Zeedle-tsxui-linux-x86_64.tar.gz
+          cp .nsh/out/rustui/Zeedle.tar.gz .nsh/out/artifacts/Zeedle-rustui-linux-x86_64.tar.gz
 
       - name: Package macOS UIs
         if: runner.os == 'macOS'
@@ -142,22 +168,27 @@ jobs:
           nsh package --target macos --out .nsh/out/tsxui
           python scripts/with-rust-root.py nsh package --target macos --out .nsh/out/rustui
 
-      - name: Archive macOS TSX UI
-        if: runner.os == 'macOS'
-        run: ditto -c -k --sequesterRsrc --keepParent .nsh/out/tsxui/Zeedle.app .nsh/out/Zeedle-tsxui.zip
-
-      - name: Archive macOS Rust UI
-        if: runner.os == 'macOS'
-        run: ditto -c -k --sequesterRsrc --keepParent .nsh/out/rustui/Zeedle.app .nsh/out/Zeedle-rustui.zip
-
-      - name: Upload packaged UIs
+      - name: Upload Windows installers
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: packages-${{ matrix.target }}
+          name: packages-windows
+          path: .nsh/out/artifacts/*.exe
+          if-no-files-found: error
+      - name: Upload Linux tarballs
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-linux
+          path: .nsh/out/artifacts/*.tar.gz
+          if-no-files-found: error
+      - name: Upload macOS app bundles
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-macos
           path: |
-            .nsh/out/Zeedle-tsxui.zip
-            .nsh/out/Zeedle-rustui.zip
-            .nsh/out/tsxui/Zeedle.tar.gz
-            .nsh/out/rustui/Zeedle.tar.gz
+            .nsh/out/tsxui/Zeedle.app
+            .nsh/out/rustui/Zeedle.app
           if-no-files-found: error
           compression-level: 0

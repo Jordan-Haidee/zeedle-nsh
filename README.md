@@ -51,22 +51,22 @@ Playback integration tests use songs from the default Music folder, including **
 
 Portable releases currently target Windows x64, Linux x64 and Apple Silicon macOS. The release workflow runs on each native platform, packages the app, captures its library, settings and About pages, and publishes only when all three jobs pass.
 
-Build locally with NSH 0.3.0 and Rust:
+Build locally with NSH 0.6.1 and Rust:
 
 ```sh
 nsh package --target linux
 nsh package --target macos
 ```
 
-On Windows, NSH's package command reads Zeedle's window and icon settings from `nsh.json`:
+On Windows, NSH's package command reads Zeedle's window and icon settings from `nsh.json` and creates an installer when Inno Setup 6 is installed:
 
 ```powershell
 nsh package App.tsx --target windows
 ```
 
-The portable files attached to each GitHub Release are named `Zeedle-<tag>-windows-x86_64.zip`, `Zeedle-<tag>-linux-x86_64.tar.gz` and `Zeedle-<tag>-macos-aarch64.zip`; `<tag>` may be `0.2.2` or `v0.2.2`. Linux requires GTK 4.14 and WebKitGTK 6.0; macOS requires version 14 or newer. The macOS archive contains an ad hoc signed `.app` bundle. Windows and Linux packages are directories archived in their platform's standard format.
+Each GitHub Release includes Windows installers named `Zeedle-<tag>-<ui>-windows-x86_64-setup.exe`, Linux packages named `Zeedle-<tag>-<ui>-linux-x86_64.tar.gz`, and macOS app bundles named `Zeedle-<tag>-<ui>-macos-aarch64.app.zip`. CI also uploads the unarchived `.app` bundles. The `<ui>` segment is `tsxui` or `rustui`; `<tag>` may be `0.2.3` or `v0.2.3`. Linux requires GTK 4.14 and WebKitGTK 6.0; macOS requires version 14 or newer. The macOS package is an ad hoc signed `.app` bundle.
 
-Push a tag matching the version in `nsh.json` (for example, `0.2.2`) to build all three archives and publish a GitHub Release. The Actions workflow can also be started manually to validate packaging and screenshots without publishing.
+Push a tag matching the version in `nsh.json` (for example, `v0.2.3`) to build all three platform packages and publish a GitHub Release. The Actions workflow can also be started manually to validate packaging and screenshots without publishing.
 
 For Windows rendering and startup checks:
 

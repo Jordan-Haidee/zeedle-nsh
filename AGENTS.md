@@ -10,7 +10,7 @@
 - `nsh check -v` checks the TSX app and Rust crate; `nsh test App.test.tsx` runs app behavior tests.
 - `cargo test --locked` runs Rust tests; `cargo fmt --check` checks Rust formatting.
 - `nsh test tests/platform-render.test.tsx --target windows` renders core screens on Windows. Replace the target with `linux` or `macos` for those hosts.
-- `nsh package App.tsx --target windows` creates the Windows portable package. Use `nsh package --target linux` or `nsh package --target macos` on the corresponding platform.
+- `nsh package App.tsx --target windows` creates the Windows package and, with Inno Setup 6 installed, a `*-setup.exe` installer. Use `nsh package --target linux` or `nsh package --target macos` on the corresponding platform.
 
 App tests use songs and lyric metadata from the default Music folder. The README lists the expected fixture tracks. Screenshot tests can update files under `docs/screenshots/`; review those image changes before including them.
 

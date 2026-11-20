@@ -1,4 +1,4 @@
-name: Portable release
+name: Platform release
 
 on:
   push:
@@ -67,21 +67,38 @@ jobs:
             libfreetype6-dev libgtk-4-dev libwebkitgtk-6.0-dev \
             libxkbcommon-dev pkg-config x11-utils xvfb
 
-      - name: Install NSH on Windows x64
+      - name: Install NSH 0.6.1 on Windows x64
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $env:NSH_VERSION = 'v0.3.0'
+          $env:NSH_VERSION = 'v0.6.1'
           irm https://nsh.dev/install.ps1 | iex
           "$env:LOCALAPPDATA\nsh\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 
-      - name: Install NSH on Linux and macOS
+      - name: Install NSH 0.6.1 on Linux and macOS
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          export NSH_VERSION=v0.3.0
+          export NSH_VERSION=v0.6.1
           curl -fsSL https://nsh.dev/install.sh | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install Inno Setup 6
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $innoRoots = @(
+            (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6'),
+            (Join-Path $env:ProgramFiles 'Inno Setup 6')
+          )
+          $innoRoot = $innoRoots | Where-Object { Test-Path (Join-Path $_ 'ISCC.exe') } | Select-Object -First 1
+          if (-not $innoRoot) {
+            winget install --id JRSoftware.InnoSetup --exact --silent --accept-package-agreements --accept-source-agreements
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation with winget failed' }
+            $innoRoot = $innoRoots | Where-Object { Test-Path (Join-Path $_ 'ISCC.exe') } | Select-Object -First 1
+          }
+          if (-not $innoRoot) { throw 'Inno Setup 6 ISCC.exe was not found' }
+          $innoRoot | Out-File -FilePath $env:GITHUB_PATH -Append
 
       - name: Validate release tag
         shell: bash
@@ -127,7 +144,9 @@ jobs:
           nsh package App.tsx --target windows
           ./scripts/check-windows-window-constraints.ps1 -Ui tsxui
           ./scripts/check-windows-startup.ps1
-          Move-Item .nsh/out/Zeedle.zip "Zeedle-$env:GITHUB_REF_NAME-tsxui-windows-${{ matrix.arch }}.zip"
+          $installer = '.nsh/out/Zeedle-setup.exe'
+          if (!(Test-Path -LiteralPath $installer)) { throw "Missing NSH installer: $installer" }
+          Copy-Item -LiteralPath $installer -Destination "Zeedle-$env:GITHUB_REF_NAME-tsxui-windows-${{ matrix.arch }}-setup.exe"
 
       - name: Package Windows Rust UI
         if: matrix.ui == 'rustui' && runner.os == 'Windows'
@@ -135,7 +154,9 @@ jobs:
         run: |
           python scripts/with-rust-root.py nsh package --target windows --out .nsh/out/rustui
           ./scripts/check-windows-window-constraints.ps1 -Ui rustui
-          Move-Item .nsh/out/rustui/Zeedle.zip "Zeedle-$env:GITHUB_REF_NAME-rustui-windows-${{ matrix.arch }}.zip"
+          $installer = '.nsh/out/rustui/Zeedle-setup.exe'
+          if (!(Test-Path -LiteralPath $installer)) { throw "Missing NSH installer: $installer" }
+          Copy-Item -LiteralPath $installer -Destination "Zeedle-$env:GITHUB_REF_NAME-rustui-windows-${{ matrix.arch }}-setup.exe"
 
       - name: Package Linux UI
         if: runner.os == 'Linux'
@@ -150,29 +171,47 @@ jobs:
             xvfb-run -a bash scripts/check-linux-window-constraints.sh tsxui
             archive=".nsh/out/tsxui/Zeedle.tar.gz"
           fi
-          mv "$archive" "Zeedle-${GITHUB_REF_NAME}-${{ matrix.ui }}-linux-${{ matrix.arch }}.tar.gz"
+          cp "$archive" "Zeedle-${GITHUB_REF_NAME}-${{ matrix.ui }}-linux-${{ matrix.arch }}.tar.gz"
 
-      - name: Package macOS TSX UI
-        if: matrix.ui == 'tsxui' && runner.os == 'macOS'
+      - name: Package macOS UI
+        if: runner.os == 'macOS'
         shell: bash
         run: |
-          nsh package --target macos --out .nsh/out/tsxui
-          ditto -c -k --sequesterRsrc --keepParent .nsh/out/tsxui/Zeedle.app \
-            "Zeedle-${GITHUB_REF_NAME}-tsxui-macos-${{ matrix.arch }}.zip"
+          if [[ "${{ matrix.ui }}" == rustui ]]; then
+            python scripts/with-rust-root.py nsh package --target macos --out .nsh/out/rustui
+            app=".nsh/out/rustui/Zeedle.app"
+          else
+            nsh package --target macos --out .nsh/out/tsxui
+            app=".nsh/out/tsxui/Zeedle.app"
+          fi
+          test -d "$app"
+          ditto -c -k --sequesterRsrc --keepParent "$app" \
+            "Zeedle-${GITHUB_REF_NAME}-${{ matrix.ui }}-macos-${{ matrix.arch }}.app.zip"
 
-      - name: Package macOS Rust UI
-        if: matrix.ui == 'rustui' && runner.os == 'macOS'
-        shell: bash
-        run: |
-          python scripts/with-rust-root.py nsh package --target macos --out .nsh/out/rustui
-          ditto -c -k --sequesterRsrc --keepParent .nsh/out/rustui/Zeedle.app \
-            "Zeedle-${GITHUB_REF_NAME}-rustui-macos-${{ matrix.arch }}.zip"
-
-      - name: Upload portable archive
+      - name: Upload Windows installer
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: Zeedle-${{ github.ref_name }}-${{ matrix.ui }}-${{ matrix.platform }}-${{ matrix.arch }}
-          path: Zeedle-${{ github.ref_name }}-${{ matrix.ui }}-${{ matrix.platform }}-${{ matrix.arch }}.*
+          name: Zeedle-${{ github.ref_name }}-${{ matrix.ui }}-windows-${{ matrix.arch }}
+          path: Zeedle-${{ github.ref_name }}-${{ matrix.ui }}-windows-${{ matrix.arch }}-setup.exe
+          if-no-files-found: error
+
+      - name: Upload Linux tarball
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zeedle-${{ github.ref_name }}-${{ matrix.ui }}-linux-${{ matrix.arch }}
+          path: Zeedle-${{ github.ref_name }}-${{ matrix.ui }}-linux-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error
+
+      - name: Upload macOS app bundle and release archive
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zeedle-${{ github.ref_name }}-${{ matrix.ui }}-macos-${{ matrix.arch }}
+          path: |
+            .nsh/out/${{ matrix.ui }}/Zeedle.app
+            Zeedle-${{ github.ref_name }}-${{ matrix.ui }}-macos-${{ matrix.arch }}.app.zip
           if-no-files-found: error
           compression-level: 0
 
@@ -188,39 +227,46 @@ jobs:
         with:
           path: dist
           pattern: Zeedle-${{ github.ref_name }}-*
-          merge-multiple: true
+          merge-multiple: false
 
-      - name: Verify all portable archives
+      - name: Verify release assets
         shell: bash
         run: |
           expected=(
-            "Zeedle-${GITHUB_REF_NAME}-tsxui-windows-x86_64.zip"
-            "Zeedle-${GITHUB_REF_NAME}-rustui-windows-x86_64.zip"
+            "Zeedle-${GITHUB_REF_NAME}-tsxui-windows-x86_64-setup.exe"
+            "Zeedle-${GITHUB_REF_NAME}-rustui-windows-x86_64-setup.exe"
             "Zeedle-${GITHUB_REF_NAME}-tsxui-linux-x86_64.tar.gz"
             "Zeedle-${GITHUB_REF_NAME}-rustui-linux-x86_64.tar.gz"
-            "Zeedle-${GITHUB_REF_NAME}-tsxui-macos-aarch64.zip"
-            "Zeedle-${GITHUB_REF_NAME}-rustui-macos-aarch64.zip"
+            "Zeedle-${GITHUB_REF_NAME}-tsxui-macos-aarch64.app.zip"
+            "Zeedle-${GITHUB_REF_NAME}-rustui-macos-aarch64.app.zip"
           )
-          for archive in "${expected[@]}"; do
-            if [[ ! -s "dist/$archive" ]]; then
-              echo "Missing release archive: $archive" >&2
-              find dist -maxdepth 1 -type f -print >&2
+          assets=()
+          for asset in "${expected[@]}"; do
+            found="$(find dist -type f -name "$asset" -print -quit)"
+            if [[ -z "$found" || ! -s "$found" ]]; then
+              echo "Missing release asset: $asset" >&2
+              find dist -type f -print >&2
               exit 1
             fi
+            assets+=("$found")
           done
-          count=$(find dist -maxdepth 1 -type f | wc -l)
+          count=$(find dist -type f \( -name '*-setup.exe' -o -name '*.tar.gz' -o -name '*.app.zip' \) | wc -l)
           if [[ "$count" -ne "${#expected[@]}" ]]; then
-            echo "Expected ${#expected[@]} portable archives, found $count" >&2
-            find dist -maxdepth 1 -type f -print >&2
+            echo "Expected ${#expected[@]} release assets, found $count" >&2
+            find dist -type f -print >&2
             exit 1
           fi
+          printf '%s\n' "${assets[@]}"
+          printf '%s\0' "${assets[@]}" > release-assets.list
 
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: >-
-          gh release create "$GITHUB_REF_NAME" dist/*
-          --repo "$GITHUB_REPOSITORY"
-          --verify-tag
-          --title "$GITHUB_REF_NAME"
-          --generate-notes
+        shell: bash
+        run: |
+          mapfile -d '' -t assets < release-assets.list
+          gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
