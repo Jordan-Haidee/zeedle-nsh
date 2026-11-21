@@ -1,4 +1,5 @@
 import { split, Text as NshText } from "nsh";
+import { AppConfig } from "zeedle-nsh/native";
 
 type NshTextProps = Parameters<typeof NshText>[0];
 type TextProps = NshTextProps & { numberOfLines?: number; children?: NshTextProps["children"] };
@@ -14,7 +15,7 @@ export function Text(props: TextProps) {
     <NshText
       {...rest}
       class={[props.class, truncate ? "truncate" : ""].filter(Boolean).join(" ")}
-      style={[props.style, lineStyle]}
+      style={[{ fontFamily: AppConfig.defaultFontFamily() }, props.style, lineStyle]}
     >
       {own.children}
     </NshText>

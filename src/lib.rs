@@ -29,6 +29,40 @@ impl AppConfig {
         serde_json::to_string(&config::Config::load()).unwrap_or_else(|_| "{}".into())
     }
 
+    /// Match the original app's CJK-capable UI font on each desktop platform.
+    pub fn default_font_family() -> String {
+        #[cfg(target_os = "windows")]
+        {
+            "Microsoft YaHei UI".into()
+        }
+        #[cfg(target_os = "linux")]
+        {
+            "Noto Sans CJK SC".into()
+        }
+        #[cfg(target_os = "macos")]
+        {
+            "PingFang SC".into()
+        }
+        #[cfg(target_os = "android")]
+        {
+            "Noto Sans CJK SC".into()
+        }
+        #[cfg(target_os = "ios")]
+        {
+            "PingFang SC".into()
+        }
+        #[cfg(not(any(
+            target_os = "windows",
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "android",
+            target_os = "ios"
+        )))]
+        {
+            "sans-serif".into()
+        }
+    }
+
     /// Save a complete Config snapshot serialized as JSON.
     pub fn save(value: String) -> String {
         let Ok(config) = serde_json::from_str::<config::Config>(&value) else {

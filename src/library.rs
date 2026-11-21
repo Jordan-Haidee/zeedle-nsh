@@ -98,6 +98,10 @@ fn parse_lyrics(text: &str) -> Vec<LyricItem> {
     let mut lines: Vec<_> = text
         .trim_start_matches('\u{feff}')
         .lines()
+        .take_while(|line| {
+            line.split_once(']')
+                .is_none_or(|(_, lyric)| lyric.trim() != "//")
+        })
         .filter_map(|line| {
             let (stamp, text) = line.split_once(']')?;
             let stamp = stamp.trim_start_matches('[');
@@ -108,14 +112,14 @@ fn parse_lyrics(text: &str) -> Vec<LyricItem> {
                 .into_iter()
                 .rev()
                 .reduce(|acc, part| acc + part * 60.0)?;
-            (time >= 0.0 && !text.trim().is_empty()).then(|| LyricItem {
+            (time > 0.0 && !text.is_empty()).then(|| LyricItem {
                 time,
                 duration: 0.0,
-                text: text.trim().to_owned(),
+                text: text.trim_end().to_owned(),
             })
         })
         .collect();
-    lines.sort_by(|a, b| a.time.total_cmp(&b.time));
+    lines.sort_by(|left, right| left.time.total_cmp(&right.time));
     for index in 0..lines.len().saturating_sub(1) {
         lines[index].duration = lines[index + 1].time - lines[index].time;
     }

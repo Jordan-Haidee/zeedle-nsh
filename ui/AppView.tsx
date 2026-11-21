@@ -12,7 +12,9 @@ import {
   setColorScheme,
   signal,
   token,
+  type InputRef,
   type ListRef,
+  type ViewRef,
 } from "nsh";
 import { Checkbox as NshCheckbox, Input } from "nsh/base";
 import { ProgressSlider } from "./components/ProgressSlider";
@@ -44,11 +46,13 @@ const contentCornerStyle = {
 
 export function App() {
   const config = JSON.parse(AppConfig.load()) as AppConfigValue;
+  const appFontFamily = AppConfig.defaultFontFamily();
   const win = currentWindow();
   win.set({
     title: "Zeedle",
     titleBar: { style: "hidden", height: 40 },
     minSize: { width: 850, height: 500 },
+    maxSize: null,
     closeOnPress: false,
   });
   win.on("closePress", () => win.hide());
@@ -95,6 +99,8 @@ export function App() {
   const trackWidth = signal(1);
   const history = signal<string[]>([]);
   const historyIndex = signal(-1);
+  let searchInputRef: InputRef | undefined;
+  let contentPaneRef: ViewRef | undefined;
   const editingSong = signal<SongInfo | null>(null);
   const editTitle = signal("");
   const editArtist = signal("");
@@ -245,8 +251,17 @@ export function App() {
   }
 
   function playNext() {
-    const list = displayedSongs();
+    const list = songs();
     if (!list.length) return;
+    const nextHistoryIndex = historyIndex() + 1;
+    if (nextHistoryIndex < history().length) {
+      const song = list.find((item) => item.song_path === history()[nextHistoryIndex]);
+      if (song) {
+        historyIndex.set(nextHistoryIndex);
+        void playSong(song, false);
+        return;
+      }
+    }
     if (mode() === "repeat" && current()) {
       void playSong(current()!, false);
       return;
@@ -267,7 +282,7 @@ export function App() {
       if (song) void playSong(song, false);
       return;
     }
-    const list = displayedSongs();
+    const list = songs();
     if (!list.length) return;
     const index = list.findIndex((song) => song.song_path === current()?.song_path);
     void playSong(list[(index - 1 + list.length) % list.length]);
@@ -352,29 +367,30 @@ export function App() {
   }
 
   function navigateToPage(target: Page) {
+    searchInputRef?.blur();
     if (target === 2) {
       lastAutoScrolledLyric = -1;
       lastLyricsScrollOffset = null;
       ignoreProgrammaticLyricsScrollUntil = Date.now() + 500;
     }
     page.set(target);
+    contentPaneRef?.focus();
   }
 
-  keymap.bind(
-    {
-      space: togglePlay,
-      left: () => seekBy(-15),
-      right: () => seekBy(15),
-      up: playPrevious,
-      down: playNext,
-      f1: () => navigateToPage(0),
-      f2: () => navigateToPage(1),
-      f3: () => navigateToPage(2),
-      f4: () => navigateToPage(3),
-      f5: () => navigateToPage(4),
-    },
-    { when: "notEditing" },
-  );
+  const shortcuts = {
+    space: togglePlay,
+    left: () => seekBy(-15),
+    right: () => seekBy(15),
+    up: playPrevious,
+    down: playNext,
+    f1: () => navigateToPage(0),
+    f2: () => navigateToPage(1),
+    f3: () => navigateToPage(2),
+    f4: () => navigateToPage(3),
+    f5: () => navigateToPage(4),
+  };
+
+  keymap.bind(shortcuts, { when: "notEditing" });
 
   async function chooseDirectory() {
     const path = await Music.chooseDirectory();
@@ -595,14 +611,14 @@ export function App() {
   const shadowColor = () => token("shadow");
 
   const textStyle = (
-    size = 13,
+    size = 14,
     color = textColor(),
     weight: "400" | "500" | "600" | "700" = "400",
   ) => ({
     fontSize: size,
     color,
     fontWeight: weight,
-    fontFamily: "Microsoft YaHei UI",
+    fontFamily: appFontFamily,
   });
 
   const controlStyle = (size = 36, radius = 9) => ({
@@ -617,6 +633,7 @@ export function App() {
       <View
         testID={`nav-${props.target}`}
         accessibilityLabel={props.label}
+        focusable={false}
         onPress={() => navigateToPage(props.target)}
         class="relative mb-1.25 h-9.5 flex-row items-center justify-start rounded-lg pl-3.5 pr-2.5 hover:bg-hover active:opacity-70"
         classList={{ "bg-hover": selected(), "gap-2.5": expanded(), "gap-0": !expanded() }}
@@ -637,7 +654,7 @@ export function App() {
         {expanded() ? (
           <Text
             style={textStyle(
-              13,
+              14,
               selected() ? textColor() : secondaryColor(),
               selected() ? "600" : "400",
             )}
@@ -824,16 +841,27 @@ export function App() {
 
   function SearchPage() {
     return (
-      <View testID="screen-1" class="flex-1 min-h-0">
+      <View
+        testID="screen-1"
+        focusable={false}
+        onPress={(event) => {
+          if ((event?.position.y ?? 0) >= 40) {
+            searchInputRef?.blur();
+            contentPaneRef?.focus();
+          }
+        }}
+        class="flex-1 min-h-0"
+      >
         <View class="h-10 flex-row items-center px-3">
           <View class="ml-0.75 mr-0.5 h-6 flex-1 flex-row items-center rounded-[3px] border-b-2 border-primary">
             <Input
+              ref={searchInputRef}
               testID="song-search"
               value={query()}
               placeholder={t("Search songs or artists...", "搜索歌曲或艺术家…")}
               onChange={({ value }) => updateSearch(value)}
               class="h-6 flex-1 bg-transparent px-1 text-[13px]"
-              style={{ color: textColor() }}
+              style={{ color: textColor(), fontFamily: appFontFamily }}
             />
             {query() ? (
               <View onPress={() => updateSearch("")} class="mr-1.5 p-0.75">
@@ -867,7 +895,8 @@ export function App() {
 
   function LyricsPage() {
     const panelHeight = signal(470);
-    const albumSize = () => Math.max(120, panelHeight() * 0.4);
+    const artworkColumnWidth = signal(0);
+    const albumSize = () => Math.min(panelHeight() * 0.4, Math.max(0, artworkColumnWidth() - 32));
     const initialLyricIndex = () => Math.max(0, lyricIndexAt(position()) - 5);
     return (
       <View
@@ -876,38 +905,45 @@ export function App() {
         class="flex-1 min-h-0 flex-row"
       >
         <View
-          class="p-5 items-center justify-center"
+          onLayout={(event) => artworkColumnWidth.set(event.bounds.size.width)}
+          class="items-center justify-center gap-1 px-4"
           style={{ width: lyrics().length ? "30%" : "100%" }}
         >
           <View
-            class="max-w-full overflow-hidden rounded-lg bg-raised"
+            class="overflow-hidden rounded-lg"
             style={{
               width: albumSize(),
               height: albumSize(),
-              boxShadow: `0 12px 28px ${shadowColor()}`,
+              boxShadow: `0 0 8px ${shadowColor()}`,
             }}
           >
-            <Image src={art()} class="size-full" />
+            <Image src={art()} class="size-full" style={{ objectFit: "contain" }} />
           </View>
-          <View class="mt-1.25 gap-0.75" style={{ width: albumSize() }}>
-            <Text
-              numberOfLines={1}
+          <View class="w-full">
+            <View
               style={{
-                ...textStyle(14, textColor()),
-                textAlign: lyrics().length ? "left" : "center",
+                width: "100%",
+                height: 25,
+                alignItems: "center",
+                justifyContent: "flex-end",
               }}
             >
-              {t("Artist:", "艺术家：")} {current()?.singer ?? t("Unknown", "未知")}
-            </Text>
-            <Text
-              numberOfLines={1}
+              <Text numberOfLines={1} style={textStyle(14, textColor())}>
+                {`${t("Artist:", "艺术家：")}${language() === "zh" ? "" : " "}${current()?.singer ?? t("Unknown", "未知")}`}
+              </Text>
+            </View>
+            <View
               style={{
-                ...textStyle(14, textColor()),
-                textAlign: lyrics().length ? "left" : "center",
+                width: "100%",
+                height: 25,
+                alignItems: "center",
+                justifyContent: "flex-end",
               }}
             >
-              {t("Title:", "歌曲：")} {current()?.song_name ?? t("No song", "无歌曲")}
-            </Text>
+              <Text numberOfLines={1} style={textStyle(14, textColor())}>
+                {`${t("Title:", "歌曲：")}${language() === "zh" ? "" : " "}${current()?.song_name ?? t("No song", "无歌曲")}`}
+              </Text>
+            </View>
           </View>
         </View>
         {lyrics().length ? (
@@ -921,11 +957,10 @@ export function App() {
             onScroll={(event) => observeLyricsScroll(event.offset.y)}
             onScrollDragStart={noteManualLyricsScroll}
             class="w-[70%] flex-1"
-            contentClass="pt-1 pb-3"
+            contentClass="px-3 pt-1 pb-3"
           >
             {(line, index) => {
-              const active = () =>
-                position() >= line().time && position() < line().time + line().duration;
+              const active = () => lyricIndexAt(position()) === index();
               return (
                 <View
                   testID={active() ? "lyric-active" : `lyric-${index()}`}
@@ -1002,13 +1037,13 @@ export function App() {
                   onPress={() => void chooseDirectory()}
                   class="h-8 flex-row items-center justify-center rounded bg-button px-3"
                 >
-                  <Text style={textStyle(13, textColor(), "500")}>{t("Browse…", "浏览…")}</Text>
+                  <Text style={textStyle(14, textColor(), "500")}>{t("Browse…", "浏览…")}</Text>
                 </View>
               </View>
             </View>
             <View class="flex-row items-center gap-2.5">
               {checkbox(showSpectrum(), t("Spectrum display", "频谱显示"), changeSpectrum)}
-              <Text onPress={changeSpectrum} style={textStyle(13, textColor())}>
+              <Text onPress={changeSpectrum} style={textStyle(14, textColor())}>
                 {t("Spectrum display", "频谱显示")}
               </Text>
             </View>
@@ -1022,7 +1057,7 @@ export function App() {
                 t("Follow system theme", "跟随系统主题"),
                 changeFollowSystem,
               )}
-              <Text onPress={changeFollowSystem} style={textStyle(13, textColor())}>
+              <Text onPress={changeFollowSystem} style={textStyle(14, textColor())}>
                 {t("Follow system theme", "跟随系统主题")}
               </Text>
             </View>
@@ -1055,7 +1090,7 @@ export function App() {
                           "text-primary-foreground": language() === option.code,
                           "text-foreground": language() !== option.code,
                         }}
-                        style={{ fontSize: 13, fontFamily: "Microsoft YaHei UI" }}
+                        style={{ fontSize: 14, fontFamily: appFontFamily }}
                       >
                         {option.label}
                       </Text>
@@ -1314,6 +1349,7 @@ export function App() {
         <View class="bg-panel px-1.5 pt-2.25 pb-2.5" style={{ width: expanded() ? 200 : 54 }}>
           <View
             testID="sidebar-toggle"
+            focusable={false}
             onPress={() => {
               LayoutAnimation.configureNext({
                 duration: 200,
@@ -1343,7 +1379,12 @@ export function App() {
           <SideButton icon="circleHelp" label={t("About", "关于")} target={4} />
         </View>
 
-        <View class="relative flex-1 min-h-0 min-w-0 flex-col bg-panel">
+        <View
+          ref={contentPaneRef}
+          focusable
+          accessibilityLabel={t("Main content", "主内容")}
+          class="relative flex-1 min-h-0 min-w-0 flex-col bg-panel"
+        >
           <View class="flex-1 min-h-0 overflow-hidden bg-page" style={contentCornerStyle}>
             {page() === 0 ? <GalleryPage /> : null}
             {page() === 1 ? <SearchPage /> : null}
