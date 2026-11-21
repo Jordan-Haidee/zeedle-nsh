@@ -28,7 +28,8 @@ function sourceFiles(directory: string): string[] {
   const files: string[] = [];
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     if (entry.isDirectory()) {
-      if (!omittedDirectories.has(entry.name)) files.push(...sourceFiles(path.join(directory, entry.name)));
+      if (!omittedDirectories.has(entry.name))
+        files.push(...sourceFiles(path.join(directory, entry.name)));
     } else if (entry.isFile() && /\.tsx?$/.test(entry.name) && !entry.name.endsWith(".d.ts")) {
       files.push(path.join(directory, entry.name));
     }
@@ -37,16 +38,30 @@ function sourceFiles(directory: string): string[] {
 }
 
 function languageServerEntry() {
-  const local = path.join(root, "node_modules", "@tailwindcss", "language-server", "bin", "tailwindcss-language-server");
+  const local = path.join(
+    root,
+    "node_modules",
+    "@tailwindcss",
+    "language-server",
+    "bin",
+    "tailwindcss-language-server",
+  );
   if (statSyncSafe(local)) return local;
 
   const npmRootCommand = process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : "npm";
-  const npmRootArgs = process.platform === "win32" ? ["/d", "/s", "/c", "npm root -g"] : ["root", "-g"];
+  const npmRootArgs =
+    process.platform === "win32" ? ["/d", "/s", "/c", "npm root -g"] : ["root", "-g"];
   const npmRoot = execFileSync(npmRootCommand, npmRootArgs, {
     cwd: root,
     encoding: "utf8",
   }).trim();
-  const global = path.join(npmRoot, "@tailwindcss", "language-server", "bin", "tailwindcss-language-server");
+  const global = path.join(
+    npmRoot,
+    "@tailwindcss",
+    "language-server",
+    "bin",
+    "tailwindcss-language-server",
+  );
   if (statSyncSafe(global)) return global;
   throw new Error(`Could not find @tailwindcss/language-server under ${npmRoot}`);
 }
@@ -79,14 +94,18 @@ server.stdout.on("data", (chunk: any) => {
     if (!Number.isFinite(contentLength)) throw new Error(`Invalid LSP header: ${header}`);
     const bodyStart = headerEnd + 4;
     if (input.length < bodyStart + contentLength) break;
-    const message = JSON.parse(input.subarray(bodyStart, bodyStart + contentLength).toString("utf8"));
+    const message = JSON.parse(
+      input.subarray(bodyStart, bodyStart + contentLength).toString("utf8"),
+    );
     input = input.subarray(bodyStart + contentLength);
     const waiter = waiters.shift();
     if (waiter) waiter(message);
     else queued.push(message);
   }
 });
-server.stderr.on("data", (chunk: any) => { stderr += chunk.toString("utf8"); });
+server.stderr.on("data", (chunk: any) => {
+  stderr += chunk.toString("utf8");
+});
 
 function send(message: LspMessage): void {
   const body = Buffer.from(JSON.stringify(message), "utf8");
@@ -140,7 +159,11 @@ while (!initializeResponse) {
 if (initializeResponse.error) throw new Error(JSON.stringify(initializeResponse.error));
 
 send({ jsonrpc: "2.0", method: "initialized", params: {} });
-send({ jsonrpc: "2.0", method: "workspace/didChangeConfiguration", params: { settings: { tailwindCSS: configuration } } });
+send({
+  jsonrpc: "2.0",
+  method: "workspace/didChangeConfiguration",
+  params: { settings: { tailwindCSS: configuration } },
+});
 
 const files = sourceFiles(root);
 const fileByUri = new Map<string, string>();
@@ -185,7 +208,13 @@ while (quietPeriods < 2) {
   }
 }
 
-const diagnostics: { file: string; line: number; severity?: number; code?: string | number; message?: string }[] = [];
+const diagnostics: {
+  file: string;
+  line: number;
+  severity?: number;
+  code?: string | number;
+  message?: string;
+}[] = [];
 for (const [uri, items] of diagnosticsByUri) {
   for (const item of items) {
     diagnostics.push({

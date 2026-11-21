@@ -40,6 +40,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tempRoot = path.resolve(os.tmpdir());
 const tempDirectory = await fs.mkdtemp(path.join(tempRoot, "zeedle-config-"));
 const configPath = path.join(tempDirectory, "config.toml");
+const tempPrefix = `${tempRoot}${path.sep}`;
+if (!path.resolve(tempDirectory).startsWith(tempPrefix))
+  throw new Error(`Refusing to use unexpected temp path: ${tempDirectory}`);
 const musicDirectory = path.join(tempDirectory, "Music");
 const musicPath = musicDirectory.replaceAll("\\", "/");
 const songPath = path.join(musicDirectory, "state-fixture.wav").replaceAll("\\", "/");
@@ -47,7 +50,9 @@ const songPath = path.join(musicDirectory, "state-fixture.wav").replaceAll("\\",
 try {
   await fs.mkdir(musicDirectory);
   await fs.writeFile(path.join(musicDirectory, "state-fixture.wav"), silentWave(240_000));
-  await fs.writeFile(configPath, `song_dir = "${musicPath}"
+  await fs.writeFile(
+    configPath,
+    `song_dir = "${musicPath}"
 current_song_path = "${songPath}"
 progress = 12.5
 play_mode = "Random"
@@ -61,7 +66,9 @@ show_spectrum = false
 current_page = 4
 sidebar_expanded = false
 gallery_viewport_y = 33.0
-`, "utf8");
+`,
+    "utf8",
+  );
 
   const result = spawnSync("nsh", ["test", "tests/config-persistence.test.tsx"], {
     cwd: root,
@@ -71,8 +78,5 @@ gallery_viewport_y = 33.0
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`nsh test exited with status ${result.status}`);
 } finally {
-  const tempPrefix = `${tempRoot}${path.sep}`;
-  const resolvedTemp = path.resolve(tempDirectory);
-  if (!resolvedTemp.startsWith(tempPrefix)) throw new Error(`Refusing to remove unexpected temp path: ${resolvedTemp}`);
-  await fs.rm(resolvedTemp, { recursive: true, force: true });
+  await fs.rm(tempDirectory, { recursive: true, force: true });
 }

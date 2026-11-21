@@ -65,6 +65,8 @@ test("loads Slint TOML, clears legacy keys, and saves current UI state on dispos
     expect(saved[key]).toBe(originalConfig[key]);
   }
   expect(normalizePath(saved.song_dir)).toBe(normalizePath(originalConfig.song_dir));
-  expect(normalizePath(saved.current_song_path)).toBe(normalizePath(originalConfig.current_song_path));
+  expect(normalizePath(saved.current_song_path)).toBe(
+    normalizePath(originalConfig.current_song_path),
+  );
   expect(saved.sidebar_expanded).toBe(!originalConfig.sidebar_expanded);
 });

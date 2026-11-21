@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "scripts": {
+    "fmt": "oxfmt --write \"**/*.ts\" \"**/*.tsx\"",
+    "fmt:check": "oxfmt --check \"**/*.ts\" \"**/*.tsx\"",
+    "lint": "oxlint --deny-warnings .",
+    "precommit": "bun run scripts/pre-commit.ts"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.79.0",
+    "oxlint": "^1.94.0"
+  }
+}

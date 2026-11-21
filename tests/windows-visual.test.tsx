@@ -3,13 +3,26 @@ import { Music } from "zeedle-nsh/native";
 import "./restore-app-config";
 
 test("Windows transport controls stay centered and pause remains stable", async () => {
-  const app = await open("../App.tsx", { width: 900, height: 510, platform: "windows", colorScheme: "dark", storage: { "zeedle.light-theme": "false", "zeedle.show-spectrum": "false" } });
+  const app = await open("../App.tsx", {
+    width: 900,
+    height: 510,
+    platform: "windows",
+    colorScheme: "dark",
+    storage: { "zeedle.light-theme": "false", "zeedle.show-spectrum": "false" },
+  });
   await app.keyboard.press("f1");
   await app.waitFor("id:control-play-pause");
-  const songs = JSON.parse(await Music.scan(Music.defaultDirectory())) as { id: number; song_name: string; singer: string; song_path: string }[];
-  if (!songs.length) throw new Error("The default Music folder needs songs for Windows screenshots");
+  const songs = JSON.parse(await Music.scan(Music.defaultDirectory())) as {
+    id: number;
+    song_name: string;
+    singer: string;
+    song_path: string;
+  }[];
+  if (!songs.length)
+    throw new Error("The default Music folder needs songs for Windows screenshots");
   const loveStory = songs.find((song) => song.song_name === "Love Story");
-  if (!loveStory) throw new Error("The default Music folder needs Love Story for Windows screenshots");
+  if (!loveStory)
+    throw new Error("The default Music folder needs Love Story for Windows screenshots");
   await app.waitFor(`text:${songs[0].song_name} - ${songs[0].singer}`);
   await app.press(`id:song-row-${loveStory.id}`);
   await app.press(`id:song-row-${loveStory.id}`);
@@ -81,7 +94,11 @@ test("Windows transport controls stay centered and pause remains stable", async 
     height: 510,
     platform: "windows",
     colorScheme: "dark",
-    storage: { "zeedle.music-directory": "Your Music Folder", "zeedle.light-theme": "false", "zeedle.show-spectrum": "false" },
+    storage: {
+      "zeedle.music-directory": "Your Music Folder",
+      "zeedle.light-theme": "false",
+      "zeedle.show-spectrum": "false",
+    },
   });
   await settings.press("id:nav-3");
   await settings.waitFor("text:Music directory");

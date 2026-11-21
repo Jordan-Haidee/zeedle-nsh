@@ -54,5 +54,10 @@ const icons = {
 export type LucideName = keyof typeof icons;
 
 export function LucideIcon(props: { name: LucideName; size?: number; color: string }) {
-  return <Image src={icons[props.name]} style={{ width: props.size ?? 18, height: props.size ?? 18, tintColor: props.color }} />;
+  return (
+    <Image
+      src={icons[props.name]}
+      style={{ width: props.size ?? 18, height: props.size ?? 18, tintColor: props.color }}
+    />
+  );
 }

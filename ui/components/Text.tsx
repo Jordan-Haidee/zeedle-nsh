@@ -6,9 +6,10 @@ type TextProps = NshTextProps & { numberOfLines?: number; children?: NshTextProp
 export function Text(props: TextProps) {
   const [own, rest] = split(props, ["numberOfLines", "children"] as const);
   const truncate = (own.numberOfLines ?? 1) === 1;
-  const lineStyle = own.numberOfLines != null && own.numberOfLines !== 1
-    ? { numberOfLines: own.numberOfLines }
-    : undefined;
+  const lineStyle =
+    own.numberOfLines != null && own.numberOfLines !== 1
+      ? { numberOfLines: own.numberOfLines }
+      : undefined;
   return (
     <NshText
       {...rest}

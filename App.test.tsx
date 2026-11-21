@@ -46,9 +46,18 @@ async function openApp(options: NonNullable<Parameters<typeof open>[1]>) {
 }
 
 test("one pause click stays paused across playback state polls", async () => {
-  const songs = JSON.parse(await Music.scan(musicDirectory)) as { song_name: string; singer: string }[];
-  if (!songs.length) throw new Error("The default Music folder must contain a song for this playback test");
-  const app = await openApp( { width: 900, height: 510, platform: "windows", storage: { "zeedle.music-directory": musicDirectory } });
+  const songs = JSON.parse(await Music.scan(musicDirectory)) as {
+    song_name: string;
+    singer: string;
+  }[];
+  if (!songs.length)
+    throw new Error("The default Music folder must contain a song for this playback test");
+  const app = await openApp({
+    width: 900,
+    height: 510,
+    platform: "windows",
+    storage: { "zeedle.music-directory": musicDirectory },
+  });
   await app.waitFor(`text:${songs[0].song_name} - ${songs[0].singer}`);
   await app.press("id:control-play-pause");
   await app.waitFor("label:Pause");
@@ -69,21 +78,30 @@ test("About links are accepted by the native browser opener only over HTTP", () 
 });
 
 test("native browser opener rejects unsafe schemes without launching", async () => {
-  expect(await Music.openUrl("javascript:alert(1)")).toBe("Only HTTP and HTTPS links can be opened");
+  expect(await Music.openUrl("javascript:alert(1)")).toBe(
+    "Only HTTP and HTTPS links can be opened",
+  );
 });
 
 test("repeat and shuffle replace each other and toggle back to order", async () => {
-  const app = await openApp( { width: 900, height: 510, platform: "windows" });
+  const app = await openApp({ width: 900, height: 510, platform: "windows" });
   await app.wait(100);
-  for (const [button, expected] of [["control-repeat", "repeat"], ["control-repeat", "order"], ["control-shuffle", "random"], ["control-repeat", "order"], ["control-shuffle", "random"]]) {
+  for (const [button, expected] of [
+    ["control-repeat", "repeat"],
+    ["control-repeat", "order"],
+    ["control-shuffle", "random"],
+    ["control-repeat", "order"],
+    ["control-shuffle", "random"],
+  ]) {
     await app.press(`id:${button}`);
-    const expectedConfigMode = expected === "order" ? "InOrder" : expected === "repeat" ? "Recursive" : "Random";
+    const expectedConfigMode =
+      expected === "order" ? "InOrder" : expected === "repeat" ? "Recursive" : "Random";
     await app.waitUntil(() => savedConfig().play_mode === expectedConfigMode);
   }
 });
 
 test("navigates between the five Zeedle pages", async () => {
-  const app = await openApp( {
+  const app = await openApp({
     width: 900,
     height: 510,
     platform: "windows",
@@ -98,11 +116,10 @@ test("navigates between the five Zeedle pages", async () => {
     await app.waitFor(`id:screen-${index}`);
     expect(app.shows(`id:screen-${index}`)).toBe(true);
   }
-
 });
 
 test("metadata actions open editable and confirmation dialogs", async () => {
-  const app = await openApp( {
+  const app = await openApp({
     width: 900,
     height: 510,
     platform: "windows",
@@ -126,9 +143,13 @@ test("metadata actions open editable and confirmation dialogs", async () => {
 });
 
 test("song rows start playback only on double click", async () => {
-  const songs = JSON.parse(await Music.scan(musicDirectory)) as { song_name: string; singer: string }[];
-  if (!songs.length) throw new Error("The default Music folder must contain a song for this playback test");
-  const app = await openApp( {
+  const songs = JSON.parse(await Music.scan(musicDirectory)) as {
+    song_name: string;
+    singer: string;
+  }[];
+  if (!songs.length)
+    throw new Error("The default Music folder must contain a song for this playback test");
+  const app = await openApp({
     width: 900,
     height: 510,
     platform: "windows",
@@ -152,7 +173,7 @@ test("song rows start playback only on double click", async () => {
 });
 
 test("pressing a lyric seeks the playing song", async () => {
-  const app = await openApp( {
+  const app = await openApp({
     width: 900,
     height: 510,
     platform: "windows",
@@ -183,7 +204,11 @@ test("pressing a lyric seeks the playing song", async () => {
 
 test("lyric seek is retained before playback starts", async () => {
   const directory = musicDirectory;
-  const songs = JSON.parse(await Music.scan(directory)) as { song_name: string; singer: string; song_path: string }[];
+  const songs = JSON.parse(await Music.scan(directory)) as {
+    song_name: string;
+    singer: string;
+    song_path: string;
+  }[];
   const song = songs.find((item) => item.song_name === "Deadman");
   if (!song) throw new Error("Deadman seek fixture was not found");
   const lines = JSON.parse(await Music.lyrics(song.song_path)) as { time: number; text: string }[];
@@ -191,7 +216,7 @@ test("lyric seek is retained before playback starts", async () => {
   if (!target) throw new Error("Deadman seek fixture has no timestamped lyrics");
 
   Music.stop();
-  const app = await openApp( {
+  const app = await openApp({
     width: 900,
     height: 510,
     platform: "windows",
@@ -213,13 +238,20 @@ test("lyric seek is retained before playback starts", async () => {
 
 test("playback keeps the active lyric in the visible list", async () => {
   const directory = musicDirectory;
-  const songs = JSON.parse(await Music.scan(directory)) as { song_name: string; song_path: string }[];
+  const songs = JSON.parse(await Music.scan(directory)) as {
+    song_name: string;
+    song_path: string;
+  }[];
   const song = songs.find((item) => item.song_name === "Love Story");
   if (!song) throw new Error("Love Story fixture was not found");
   const lyricItems = JSON.parse(await Music.lyrics(song.song_path)) as { time: number }[];
-  const targetTime = Math.max(...lyricItems.filter((line) => line.time <= 90).map((line) => line.time));
-  const steps = new Set(lyricItems.filter((line) => line.time > 0 && line.time <= targetTime).map((line) => line.time)).size;
-  const app = await openApp( {
+  const targetTime = Math.max(
+    ...lyricItems.filter((line) => line.time <= 90).map((line) => line.time),
+  );
+  const steps = new Set(
+    lyricItems.filter((line) => line.time > 0 && line.time <= targetTime).map((line) => line.time),
+  ).size;
+  const app = await openApp({
     width: 900,
     height: 510,
     platform: "windows",
@@ -242,7 +274,7 @@ test("playback keeps the active lyric in the visible list", async () => {
 });
 
 test("the About page shows the NSH browser link", async () => {
-  const app = await openApp( {
+  const app = await openApp({
     width: 900,
     height: 510,
     platform: "windows",
@@ -256,7 +288,7 @@ test("the About page shows the NSH browser link", async () => {
 });
 
 test("clicking the progress bar seeks the playing song", async () => {
-  const app = await openApp( {
+  const app = await openApp({
     width: 900,
     height: 510,
     platform: "windows",
@@ -281,7 +313,7 @@ test("clicking the progress bar seeks the playing song", async () => {
 });
 
 test("dragging the progress slider seeks when the drag ends", async () => {
-  const app = await openApp( {
+  const app = await openApp({
     width: 900,
     height: 510,
     platform: "windows",
@@ -313,7 +345,7 @@ test("dragging the progress slider seeks when the drag ends", async () => {
 });
 
 test("mounted settings restyle when the system appearance changes", async () => {
-  const app = await openApp( {
+  const app = await openApp({
     width: 900,
     height: 510,
     platform: "windows",
@@ -333,7 +365,7 @@ test("mounted settings restyle when the system appearance changes", async () => 
 });
 
 test("turning off system-follow pins the current appearance", async () => {
-  const app = await openApp( {
+  const app = await openApp({
     width: 900,
     height: 510,
     platform: "windows",

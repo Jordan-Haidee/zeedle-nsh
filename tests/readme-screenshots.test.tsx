@@ -7,7 +7,11 @@ test("captures full Zeedle screens for the public README", async () => {
     height: 510,
     platform: "windows",
     colorScheme: "dark",
-    storage: { "zeedle.light-theme": "false", "zeedle.show-spectrum": "true", "zeedle.language": "en" },
+    storage: {
+      "zeedle.light-theme": "false",
+      "zeedle.show-spectrum": "true",
+      "zeedle.language": "en",
+    },
   });
 
   await app.waitFor("text:Deadman - 蔡徐坤");

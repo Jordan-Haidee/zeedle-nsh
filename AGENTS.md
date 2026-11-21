@@ -8,6 +8,9 @@
 
 - `nsh run` starts the app with hot reload.
 - `nsh check -v` checks the TSX app and Rust crate; `nsh test App.test.tsx` runs app behavior tests.
+- `bun run fmt` formats all TypeScript and TSX files with Oxfmt; `bun run fmt:check` checks formatting without changing files.
+- `bun run lint` lints TypeScript and TSX files with Oxlint.
+- The repository pre-commit hook checks formatting and lint for staged TypeScript/TSX files, then runs `nsh check`. Enable it once per clone with `git config core.hooksPath .githooks`.
 - `bun run scripts/check-tailwind-lsp.ts` runs the Tailwind language server over all project TS/TSX using the repository-owned `tailwind-lsp.config.json` rules.
 - `bun run scripts/test_config_persistence.ts` runs the isolated config-persistence integration test and its temporary WAV fixture.
 - `cargo test --locked` runs Rust tests; `cargo fmt --check` checks Rust formatting.

@@ -12,7 +12,14 @@ export type SongInfo = {
 };
 
 export type LyricItem = { time: number; duration: number; text: string };
-export type PlaybackState = { position: number; duration: number; paused: boolean; volume: number; error: string; spectrum: number[] };
+export type PlaybackState = {
+  position: number;
+  duration: number;
+  paused: boolean;
+  volume: number;
+  error: string;
+  spectrum: number[];
+};
 export type AppConfigValue = {
   song_dir: string;
   current_song_path: string | null;
