@@ -1,5 +1,6 @@
 import { expect, open, test } from "nsh/test";
 import { AppConfig, Music } from "zeedle-nsh/native";
+import "./tests/restore-app-config";
 
 const musicDirectory = Music.defaultDirectory();
 type TestAppConfig = {
@@ -280,7 +281,7 @@ test("clicking the progress bar seeks the playing song", async () => {
   expect(tapped > started.position + started.duration * 0.4).toBe(true);
 });
 
-test("dragging the progress bar does not seek", async () => {
+test("dragging the progress slider seeks when the drag ends", async () => {
   const app = await openApp( {
     width: 900,
     height: 510,
@@ -299,10 +300,17 @@ test("dragging the progress bar does not seek", async () => {
   await app.waitFor("text:一眼万年 - S.H.E");
   await app.wait(150);
   const before = (JSON.parse(Music.state()) as { position: number }).position;
-  await app.drag("id:progress-seek", { x: 150, y: 0 });
+  const progressBefore = app.texts().find((text) => text.includes(" / 04:29"));
+  await app.dragAndHold("label:Playback progress", { x: 150, y: 0 });
+  await app.wait(100);
+  const during = (JSON.parse(Music.state()) as { position: number }).position;
+  const progressDuring = app.texts().find((text) => text.includes(" / 04:29"));
+  expect(progressDuring !== progressBefore).toBe(true);
+  expect(during < before + 5).toBe(true);
+  await app.drop();
   await app.wait(150);
   const after = (JSON.parse(Music.state()) as { position: number }).position;
-  expect(after < before + 5).toBe(true);
+  expect(after > before + 5).toBe(true);
 });
 
 test("mounted settings restyle when the system appearance changes", async () => {

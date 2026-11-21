@@ -1,4 +1,5 @@
 import { expect, open, test } from "nsh/test";
+import "./restore-app-config";
 
 const legacySettings = {
   "zeedle.music-directory": "C:/legacy-music",

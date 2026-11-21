@@ -1,6 +1,10 @@
 import { expect, open, test } from "nsh/test";
+import { AppConfig } from "zeedle-nsh/native";
+import "./restore-app-config";
 
 test("renders desktop pages and captures platform screenshots", async () => {
+  const config = JSON.parse(AppConfig.load()) as { current_page: number } & Record<string, unknown>;
+  AppConfig.save(JSON.stringify({ ...config, current_page: 0 }));
   const app = await open("../App.tsx", {
     width: 900,
     height: 510,

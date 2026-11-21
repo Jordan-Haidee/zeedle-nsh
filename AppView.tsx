@@ -1,51 +1,15 @@
-import { cleanup, effect, Image, LayoutAnimation, List, Scroll, Storage, Text as NshText, View, colorScheme, keymap, setColorScheme, signal, split, token, type ListRef } from "nsh";
+import { cleanup, effect, Image, LayoutAnimation, List, Scroll, Storage, View, colorScheme, keymap, setColorScheme, signal, token, type ListRef } from "nsh";
 import { Checkbox as NshCheckbox, Input } from "nsh/base";
+import { ProgressSlider } from "./app/ui/ProgressSlider";
+import { PlayerTransportButton, VolumeControl } from "./app/ui/PlayerControls";
+import { Text } from "./app/ui/Text";
 import { currentWindow, Menu, titleBar } from "nsh/desktop";
 import { AppConfig, Music } from "zeedle-nsh/native";
 import { LucideIcon, type LucideName } from "./icons";
 import cover from "./assets/cover.svg";
 import { translate, type Language } from "./translations";
-
-type Page = 0 | 1 | 2 | 3 | 4;
-type SortField = "song_name" | "singer" | "duration_secs";
-type PlayMode = "order" | "repeat" | "random";
-type SongInfo = { id: number; song_name: string; singer: string; duration: string; duration_secs: number; song_path: string };
-type LyricItem = { time: number; duration: number; text: string };
-type PlaybackState = { position: number; duration: number; paused: boolean; volume: number; error: string; spectrum: number[] };
-type AppConfigValue = {
-  song_dir: string; current_song_path: string | null; progress: number; play_mode: "InOrder" | "Recursive" | "Random";
-  sort_key: "BySongName" | "BySinger" | "ByDuration"; sort_ascending: boolean; lang: string; light_ui: boolean;
-  follow_system_theme: boolean; volume: number; show_spectrum: boolean; current_page: number; sidebar_expanded: boolean;
-  gallery_viewport_y: number;
-};
-
-type NshTextProps = Parameters<typeof NshText>[0];
-type TextProps = NshTextProps & { numberOfLines?: number; children?: NshTextProps["children"] };
-function Text(props: TextProps) {
-  const [own, rest] = split(props, ["numberOfLines", "children"] as const);
-  const truncate = (own.numberOfLines ?? 1) === 1;
-  const lineStyle = own.numberOfLines != null && own.numberOfLines !== 1
-    ? { numberOfLines: own.numberOfLines }
-    : undefined;
-  return (
-    <NshText
-      {...rest}
-      class={[props.class, truncate ? "truncate" : ""].filter(Boolean).join(" ")}
-      style={[props.style, lineStyle]}
-    >
-      {own.children}
-    </NshText>
-  );
-}
-
-function timeLabel(seconds: number) {
-  const value = Math.max(0, Math.floor(seconds || 0));
-  return `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
-}
-
-function sameSongPath(left: string | null | undefined, right: string | null | undefined) {
-  return left?.replaceAll("\\", "/") === right?.replaceAll("\\", "/");
-}
+import type { AppConfigValue, LyricItem, Page, PlaybackState, PlayMode, SongInfo, SortField } from "./app/types";
+import { sameSongPath, timeLabel } from "./app/format";
 
 export function App() {
   const config = JSON.parse(AppConfig.load()) as AppConfigValue;
@@ -82,6 +46,7 @@ export function App() {
   const requestedSongPath = config.current_song_path;
   const spectrumBars = signal<number[]>(Array.from({ length: 48 }, () => 0));
   const playerError = signal("");
+  const seeking = signal(false);
   const trackWidth = signal(1);
   const history = signal<string[]>([]);
   const historyIndex = signal(-1);
@@ -279,6 +244,13 @@ export function App() {
     Music.seek(next);
   }
 
+  function progressAtX(x: number) {
+    const width = trackWidth();
+    return width > 0 && duration() > 0
+      ? Math.max(0, Math.min(1, x / width)) * duration()
+      : 0;
+  }
+
   function noteManualLyricsScroll() {
     manualLyricsScrollUntil = Date.now() + 5000;
     lastAutoScrolledLyric = -1;
@@ -306,13 +278,6 @@ export function App() {
       activeIndex = index;
     }
     return activeIndex;
-  }
-
-  function progressAtX(x: number) {
-    const width = trackWidth();
-    return width > 0 && duration() > 0
-      ? Math.max(0, Math.min(1, x / width)) * duration()
-      : 0;
   }
 
   function seekBy(seconds: number) {
@@ -475,7 +440,7 @@ export function App() {
   setInterval(() => {
     const state = JSON.parse(Music.state()) as PlaybackState;
     if (!state.paused && state.duration > 0) {
-      position.set(state.position);
+      if (!seeking()) position.set(state.position);
       duration.set(state.duration);
     }
     if (!pausePending()) paused.set(state.paused);
@@ -492,14 +457,11 @@ export function App() {
   const textColor = () => token("foreground");
   const secondaryColor = () => token("text-secondary");
   const mutedColor = () => token("text-tertiary");
-  const pageColor = () => token("page");
   const accentColor = () => token("primary");
   const dangerColor = () => token("danger");
   const dangerSurfaceColor = () => token("danger-surface");
   const dangerTextColor = () => token("danger-text");
   const shadowColor = () => token("shadow");
-  const trackColor = () => token("track");
-  const trackThumbBorderColor = () => token("track-thumb-border");
 
   const textStyle = (size = 13, color = textColor(), weight: "400" | "500" | "600" | "700" = "400") => ({
     fontSize: size,
@@ -513,73 +475,6 @@ export function App() {
     height: size,
     borderRadius: radius,
   });
-
-  function PlayerTransportIcon(props: { name: LucideName; color: string; visible?: boolean }) {
-    return (
-      <View class="pointer-events-none absolute left-[5px] top-[5px] size-[26px] items-center justify-center" style={{ opacity: props.visible === false ? 0 : 1 }}>
-        <Image src={Music.transportIcon(props.name, props.color)} class="size-[26px] object-contain" />
-      </View>
-    );
-  }
-
-  function PlayerTransportButton(props: { testID: string; label: string; name: LucideName; color: string; onPress: () => void; radius?: number }) {
-    return (
-      <View
-        testID={props.testID}
-        accessibilityLabel={props.label}
-        onPress={props.onPress}
-        class="relative items-center justify-center hover:bg-hover active:bg-pressed transition-colors duration-[120ms] ease-out motion-reduce:transition-none"
-        style={controlStyle(36, props.radius ?? 9)}
-      >
-        {props.name === "play" || props.name === "pause" ? <>
-          <PlayerTransportIcon name="play" color={props.color} visible={props.name === "play"} />
-          <PlayerTransportIcon name="pause" color={props.color} visible={props.name === "pause"} />
-        </> : <PlayerTransportIcon name={props.name} color={props.color} />}
-      </View>
-    );
-  }
-
-  function VolumeControl() {
-    const hovered = signal(false);
-    const setVolumeAt = (y: number) => {
-      const next = Math.max(0, Math.min(1, 1 - y / 55));
-      volume.set(next);
-      Music.setVolume(next);
-    };
-    return (
-      <View
-        class="relative h-[68px] w-full items-center justify-center"
-        onMouseEnter={() => hovered.set(true)}
-        onMouseLeave={() => hovered.set(false)}
-      >
-        {hovered() ? (
-          <View
-            accessibilityLabel={t("Volume", "音量")}
-            accessibilityValue={{ min: 0, max: 1, now: volume() }}
-            role="adjustable"
-            onPress={(event) => setVolumeAt(event?.position.y ?? 27.5)}
-            class="absolute right-[13px] top-[6px] h-[55px] w-[20px]"
-          >
-            <View class="pointer-events-none absolute left-2 top-0 h-[55px] w-1 rounded-full" style={{ backgroundColor: trackColor() }}>
-              <View class="absolute bottom-0 left-0 w-1 rounded-full" style={{ height: 55 * volume(), backgroundColor: accentColor() }} />
-              <View class="absolute -left-[3px] h-[10px] w-[10px] rounded-full border" style={{ bottom: Math.max(0, Math.min(50, 55 * volume() - 5)), borderColor: pageColor(), backgroundColor: accentColor() }} />
-            </View>
-          </View>
-        ) : null}
-        <View
-          accessibilityLabel={t("Mute", "静音")}
-          onPress={() => {
-            const next = volume() > 0 ? 0 : 0.8;
-            volume.set(next);
-            Music.setVolume(next);
-          }}
-          class="flex h-[30px] w-7 items-center justify-center hover:bg-hover active:bg-pressed"
-        >
-          <LucideIcon name="volume2" size={20} color={hovered() ? accentColor() : secondaryColor()} />
-        </View>
-      </View>
-    );
-  }
 
   function SideButton(props: { icon: LucideName; label: string; target: Page }) {
     const selected = () => page() === props.target;
@@ -880,21 +775,28 @@ export function App() {
   }
 
   function PlayerPanel() {
-    const progressPercent = () => duration() > 0 ? Math.max(0, Math.min(100, (position() / duration()) * 100)) : 0;
     return (
       <View class="h-[72px] min-h-[72px] bg-page">
         <View
           testID="progress-seek"
-          accessibilityLabel={t("Playback progress", "播放进度")}
-          accessibilityValue={{ min: 0, max: duration(), now: position() }}
-          role="adjustable"
           hitSlop={{ top: 8, bottom: 8 }}
           onPress={(event) => seekTo(progressAtX(event?.position.x ?? 0))}
           onLayout={(event) => trackWidth.set(event.bounds.size.width)}
           class="mx-2.5 h-1 justify-center bg-track"
         >
-          <View class="h-[3px] bg-primary" style={{ width: `${progressPercent()}%` }} />
-          <View class="absolute top-[-8px] -ml-[10px] size-5 rounded-full border-[3px]" style={{ left: `${progressPercent()}%`, borderColor: trackThumbBorderColor(), backgroundColor: accentColor() }} />
+          <ProgressSlider
+            position={position}
+            duration={duration}
+            label={t("Playback progress", "播放进度")}
+            onChange={(next) => {
+              seeking.set(true);
+              position.set(next);
+            }}
+            onChangeEnd={(next) => {
+              seekTo(next);
+              seeking.set(false);
+            }}
+          />
         </View>
         <View class="h-[68px] flex-row items-center">
           <View class="w-[35%] flex-row items-center gap-[3px]" onPress={() => navigateToPage(2)}>
@@ -932,7 +834,15 @@ export function App() {
             <Text style={textStyle(14, textColor())}>{timeLabel(position())} / {timeLabel(duration())}</Text>
           </View>
           <View class="w-[10%] items-center justify-center">
-            <VolumeControl />
+            <VolumeControl
+              volume={volume}
+              volumeLabel={t("Volume", "音量")}
+              muteLabel={t("Mute", "静音")}
+              onVolumeChange={(next) => {
+                volume.set(next);
+                Music.setVolume(next);
+              }}
+            />
           </View>
         </View>
       </View>

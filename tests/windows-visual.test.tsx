@@ -1,5 +1,6 @@
 import { expect, open, test } from "nsh/test";
 import { Music } from "zeedle-nsh/native";
+import "./restore-app-config";
 
 test("Windows transport controls stay centered and pause remains stable", async () => {
   const app = await open("../App.tsx", { width: 900, height: 510, platform: "windows", colorScheme: "dark", storage: { "zeedle.light-theme": "false", "zeedle.show-spectrum": "false" } });

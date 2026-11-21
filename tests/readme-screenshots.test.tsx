@@ -1,4 +1,5 @@
 import { expect, open, test } from "nsh/test";
+import "./restore-app-config";
 
 test("captures full Zeedle screens for the public README", async () => {
   const app = await open("../App.tsx", {
