@@ -34,7 +34,7 @@ export function selectPreviousSong(
   if (!songs.length) return null;
   if (mode === "random") {
     const previousHistorySong = songs.find((song) => song.song_path === history[historyIndex - 1]);
-    return previousHistorySong ?? songs.find((song) => song.song_path !== currentPath) ?? songs[0];
+    if (previousHistorySong) return previousHistorySong;
   }
 
   const index = songs.findIndex((song) => song.song_path === currentPath);

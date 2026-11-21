@@ -23,7 +23,7 @@ Zeedle is a lightweight desktop music player focused on your local library. This
 - Follow embedded lyrics or adjacent LRC files, and seek by clicking a lyric line.
 - View a live audio spectrum while music plays.
 - Edit song metadata, album art and lyrics from the library.
-- Choose playback order, repeat or shuffle; use keyboard shortcuts for playback and navigation.
+- Choose playback order, repeat or shuffle, and use keyboard shortcuts for playback and navigation. Order follows the sorted library and wraps at either end; Repeat keeps the current track on Next; Shuffle avoids immediately picking the current track and lets Previous/Next retrace shuffle history.
 - Close the window to keep Zeedle running in the system tray; show it again, rescan or exit from the tray menu.
 - Switch between English, Chinese, Spanish, French, German and Russian, and follow the system theme.
 
@@ -167,7 +167,7 @@ The original Zeedle project is maintained at [Jordan-Haidee/zeedle](https://gith
 
 ## Screenshots
 
-The following full-window captures show the Windows app in English. Search, lyrics and metadata editing are shown with “Love Story” by Taylor Swift.
+The following full-window captures show the Windows app in English. The library capture shows Shuffle selected. Search, lyrics and metadata editing are shown with “Love Story” by Taylor Swift.
 
 ### Music library
 

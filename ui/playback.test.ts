@@ -26,6 +26,7 @@ test("random navigation avoids the current song and follows visited history", ()
   expect(selectNextSong(songs, "b", "random", [], -1, 0)?.song_path).toBe("a");
   expect(selectNextSong(songs, "b", "random", ["a", "b", "c"], 1)?.song_path).toBe("c");
   expect(selectPreviousSong(songs, "c", "random", ["a", "b", "c"], 2)?.song_path).toBe("b");
+  expect(selectPreviousSong(songs, "c", "random", [], -1)?.song_path).toBe("b");
 });
 
 test("navigation safely handles an empty library and a one-song shuffle", () => {
