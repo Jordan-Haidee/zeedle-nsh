@@ -42,7 +42,7 @@ const savedConfig = () => JSON.parse(AppConfig.load()) as TestAppConfig;
 async function openApp(options: NonNullable<Parameters<typeof open>[1]>) {
   const error = AppConfig.save(JSON.stringify(configFromStorage(options.storage ?? {})));
   if (error) throw new Error(error);
-  return open("./App.test-entry.tsx", options);
+  return open("./App.tsx", options);
 }
 
 test("one pause click stays paused across playback state polls", async () => {
