@@ -1,3 +1,5 @@
+> Historical implementation record. The Rust UI was removed on 2026-11-21. Rust-UI-specific steps and commands below are archived and are not part of the current build; the shared config and logging backend remains in use by the TSX app.
+
 # NSH 配置与日志对齐实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `executing-plans` to implement this plan task by task. Steps use checkbox syntax for tracking.

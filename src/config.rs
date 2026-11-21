@@ -2,16 +2,6 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "rust-ui")]
-pub const LEGACY_STORAGE_KEYS: [&str; 6] = [
-    "zeedle.music-directory",
-    "zeedle.volume",
-    "zeedle.play-mode",
-    "zeedle.show-spectrum",
-    "zeedle.language",
-    "zeedle.light-theme",
-];
-
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PlayMode {
     #[default]

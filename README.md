@@ -15,7 +15,7 @@
 
 ---
 
-Zeedle is a lightweight desktop music player focused on your local library. This project brings the original Zeedle experience to [Native Shell](https://nsh.dev), with Rust and TSX interfaces sharing one Rust audio and metadata backend.
+Zeedle is a lightweight desktop music player focused on your local library. This project brings the original Zeedle experience to [Native Shell](https://nsh.dev), with a TSX interface and a Rust audio and metadata backend.
 
 ## Features
 
@@ -34,9 +34,7 @@ Install the [NSH CLI](https://nsh.dev/docs/) and a Rust toolchain, then run:
 nsh run
 ```
 
-The app directory starts the TSX UI in `App.tsx` by default. On Windows, use `nsh run --window-size 900x510` to set the initial window size.
-
-To temporarily run the Rust UI, use `pwsh -File scripts/run-rust-ui.ps1`. It restores `nsh.json` and `Cargo.toml` when NSH exits, and accepts NSH run options supported by Rust roots, such as `--verbose`.
+The app directory starts the TSX interface in `App.tsx`. On Windows, use `nsh run --window-size 900x510` to set the initial window size.
 
 To check the app and run its tests:
 
@@ -64,7 +62,7 @@ On Windows, NSH's package command reads Zeedle's window and icon settings from `
 nsh package App.tsx --target windows
 ```
 
-Each GitHub Release includes Windows installers named `Zeedle-<tag>-<ui>-windows-x86_64-setup.exe`, Linux packages named `Zeedle-<tag>-<ui>-linux-x86_64.tar.gz`, and macOS app bundles named `Zeedle-<tag>-<ui>-macos-aarch64.app.zip`. CI also uploads the unarchived `.app` bundles. The `<ui>` segment is `tsxui` or `rustui`; `<tag>` may be `0.2.3` or `v0.2.3`. Linux requires GTK 4.14 and WebKitGTK 6.0; macOS requires version 14 or newer. The macOS package is an ad hoc signed `.app` bundle.
+Each GitHub Release includes one Windows installer, one Linux package and one macOS app bundle, named `Zeedle-<tag>-windows-x86_64-setup.exe`, `Zeedle-<tag>-linux-x86_64.tar.gz` and `Zeedle-<tag>-macos-aarch64.app.zip`. CI also uploads the unarchived `.app` bundle. Linux requires GTK 4.14 and WebKitGTK 6.0; macOS requires version 14 or newer. The macOS package is an ad hoc signed `.app` bundle.
 
 Push a tag matching the version in `nsh.json` (for example, `v0.2.3`) to build all three platform packages and publish a GitHub Release. The Actions workflow can also be started manually to validate packaging and screenshots without publishing.
 
@@ -78,11 +76,10 @@ nsh test tests/platform-render.test.tsx --target macos
 powershell -File scripts/check-windows-startup.ps1
 ```
 
-The platform render test captures the library, settings and About screens from each native desktop host. CI runs the Linux test in Xvfb and uploads all nine screenshots for review.
+The platform render test captures the library, settings and About screens from each native desktop host. CI runs the Linux test in Xvfb and uploads the screenshots for review.
 
 ## Project structure
 
-- `src/ui/` — Rust screens, navigation and player controls.
 - `App.tsx` — TSX interface and the default entry for `nsh run`.
 - `src/lib.rs` and `src/spectrum.rs` — audio playback, metadata, browser links and spectrum analysis.
 - `assets/icons/` — Lucide SVG interface icons.

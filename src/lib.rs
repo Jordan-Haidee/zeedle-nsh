@@ -25,8 +25,6 @@ use serde::{Deserialize, Serialize};
 mod config;
 mod logger;
 mod spectrum;
-#[cfg(feature = "rust-ui")]
-pub mod ui;
 use spectrum::{SpectrumChunk, TapSource, default_spectrum, try_start_spectrum_worker};
 
 #[native_module("zeedle-nsh/native")]
@@ -34,11 +32,9 @@ fn native(registry: &mut Registry) {
     logger::init_default_logger(None);
     registry.module::<Music>();
     registry.module::<AppConfig>();
-    #[cfg(feature = "rust-ui")]
-    registry.register::<ui::App>().assets(assets!());
 }
 
-/// Shared Slint-compatible app configuration used by both NSH frontends.
+/// Persisted app configuration exposed to the TSX interface.
 #[module]
 pub struct AppConfig;
 

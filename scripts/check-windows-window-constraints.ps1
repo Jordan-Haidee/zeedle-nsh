@@ -1,10 +1,3 @@
-[CmdletBinding()]
-param(
-  [Parameter(Mandatory = $true)]
-  [ValidateSet('tsxui', 'rustui')]
-  [string]$Ui
-)
-
 $ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition @'
 using System;
@@ -93,7 +86,7 @@ public static class NativeWindowConstraintsProbe {
 }
 '@
 
-$appDirectory = if ($Ui -eq 'rustui') { '.nsh/out/rustui/Zeedle' } else { '.nsh/out/Zeedle' }
+$appDirectory = '.nsh/out/Zeedle'
 $executable = Join-Path $appDirectory 'Zeedle.exe'
 if (!(Test-Path -LiteralPath $executable)) { throw "Missing packaged executable: $executable" }
 
@@ -104,13 +97,12 @@ try {
   do {
     $process.Refresh()
     $window = [NativeWindowConstraintsProbe]::FindWindow($process.Id)
-    if ($process.HasExited) { throw "Packaged $Ui UI exited with code $($process.ExitCode)" }
+    if ($process.HasExited) { throw "Packaged app exited with code $($process.ExitCode)" }
     if ($window -eq [IntPtr]::Zero) { Start-Sleep -Milliseconds 100 }
   } while ($window -eq [IntPtr]::Zero -and [DateTime]::UtcNow -lt $deadline)
   if ($window -eq [IntPtr]::Zero) { throw "Packaged $Ui UI did not create a visible NSH window" }
   $firstVisible = [WindowRect]::new()
   if (![NativeWindowConstraintsProbe]::GetWindowRect($window, [ref]$firstVisible)) { throw 'Initial GetWindowRect failed' }
-  if ($Ui -eq 'rustui') { Start-Sleep -Seconds 2 }
 
   $client = [WindowRect]::new()
   $outer = [WindowRect]::new()
@@ -136,24 +128,24 @@ try {
     [Math]::Abs($firstVisible.Right - $outer.Right),
     [Math]::Abs($firstVisible.Bottom - $outer.Bottom)
   ) | Where-Object { $_ -gt 1 }
-  Write-Output "${Ui}: first rect $($firstVisible.Left),$($firstVisible.Top)-$($firstVisible.Right),$($firstVisible.Bottom); final rect $($outer.Left),$($outer.Top)-$($outer.Right),$($outer.Bottom); client ${clientWidth}x${clientHeight}, minimum ${minimumWidth}x${minimumHeight} points, center error ${centerErrorX}x${centerErrorY}px at DPI $dpi"
+  Write-Output "App: first rect $($firstVisible.Left),$($firstVisible.Top)-$($firstVisible.Right),$($firstVisible.Bottom); final rect $($outer.Left),$($outer.Top)-$($outer.Right),$($outer.Bottom); client ${clientWidth}x${clientHeight}, minimum ${minimumWidth}x${minimumHeight} points, center error ${centerErrorX}x${centerErrorY}px at DPI $dpi"
   if ($centerErrorX -gt 4 -or $centerErrorY -gt 4) {
-    throw "$Ui startup window should be centered in the monitor work area"
+    throw "Startup window should be centered in the monitor work area"
   }
   if ($startupGeometryChanged) {
-    throw "$Ui window moved or resized after its first visible frame"
+    throw "Window moved or resized after its first visible frame"
   }
   $hasWindowIcons = [NativeWindowConstraintsProbe]::HasWindowIcons($window)
   $hasEmbeddedIcon = [NativeWindowConstraintsProbe]::HasEmbeddedIcon((Resolve-Path -LiteralPath $executable).Path)
-  Write-Output "${Ui}: window icons $hasWindowIcons, embedded executable icon $hasEmbeddedIcon"
+  Write-Output "Window icons $hasWindowIcons, embedded executable icon $hasEmbeddedIcon"
   if (!$hasWindowIcons -or !$hasEmbeddedIcon) {
-    throw "$Ui must expose large/small taskbar icons and embed an executable icon"
+    throw "The app must expose large/small taskbar icons and embed an executable icon"
   }
   if ([Math]::Abs($clientWidth - 900) -gt 1 -or [Math]::Abs($clientHeight - 510) -gt 1) {
-    throw "$Ui startup client size should be 900x510 points"
+    throw "Startup client size should be 900x510 points"
   }
   if ([Math]::Abs($minimumWidth - 850) -gt 1 -or [Math]::Abs($minimumHeight - 500) -gt 1) {
-    throw "$Ui native minimum should be 850x500 content points"
+    throw "Native minimum should be 850x500 content points"
   }
 } finally {
   if ($window -ne [IntPtr]::Zero) { [void][NativeWindowConstraintsProbe]::PostMessageW($window, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero) }
