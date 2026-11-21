@@ -1,10 +1,6 @@
 import { expect, open, test } from "nsh/test";
-import { AppConfig } from "zeedle-nsh/native";
-import "./restore-app-config";
 
 test("renders desktop pages and captures platform screenshots", async () => {
-  const config = JSON.parse(AppConfig.load()) as { current_page: number } & Record<string, unknown>;
-  AppConfig.save(JSON.stringify({ ...config, current_page: 0 }));
   const app = await open("../App.tsx", {
     width: 900,
     height: 510,
@@ -17,6 +13,8 @@ test("renders desktop pages and captures platform screenshots", async () => {
     },
   });
 
+  await app.waitUntil(() => [0, 1, 2, 3, 4].some((index) => app.shows(`id:screen-${index}`)));
+  await app.press("id:nav-0");
   await app.waitFor("id:screen-0");
   expect((await app.screenshot("target/platform-render-library.png")).length > 1000).toBe(true);
 

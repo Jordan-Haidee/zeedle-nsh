@@ -95,6 +95,14 @@ jobs:
       - name: Check TSX UI
         run: nsh check -v
 
+      - name: Test playback selection
+        if: runner.os != 'Linux'
+        run: nsh test ui/playback.test.ts --target ${{ matrix.target }}
+
+      - name: Test playback selection on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a nsh test ui/playback.test.ts --target linux
+
       - name: Render TSX UI
         if: runner.os != 'Linux'
         run: nsh test tests/platform-render.test.tsx --target ${{ matrix.target }}

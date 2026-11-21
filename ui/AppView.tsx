@@ -36,6 +36,7 @@ import type {
   SortField,
 } from "./types";
 import { sameSongPath, timeLabel } from "./format";
+import { selectNextSong, selectPreviousSong } from "./playback";
 
 const contentCornerStyle = {
   borderRadius: 10,
@@ -252,40 +253,43 @@ export function App() {
 
   function playNext() {
     const list = songs();
-    if (!list.length) return;
     const nextHistoryIndex = historyIndex() + 1;
-    if (nextHistoryIndex < history().length) {
-      const song = list.find((item) => item.song_path === history()[nextHistoryIndex]);
-      if (song) {
-        historyIndex.set(nextHistoryIndex);
-        void playSong(song, false);
-        return;
-      }
-    }
-    if (mode() === "repeat" && current()) {
-      void playSong(current()!, false);
+    const nextHistorySong = list.find((song) => song.song_path === history()[nextHistoryIndex]);
+    const song = selectNextSong(
+      list,
+      current()?.song_path ?? null,
+      mode(),
+      history(),
+      historyIndex(),
+    );
+    if (!song) return;
+    if (mode() === "random" && nextHistorySong?.song_path === song.song_path) {
+      historyIndex.set(nextHistoryIndex);
+      void playSong(song, false);
       return;
     }
-    const index = list.findIndex((song) => song.song_path === current()?.song_path);
-    const nextIndex =
-      mode() === "random"
-        ? Math.floor(Math.random() * list.length)
-        : (index + 1 + list.length) % list.length;
-    void playSong(list[nextIndex]);
+    void playSong(song, mode() === "repeat" ? false : true);
   }
 
   function playPrevious() {
-    const previous = historyIndex() - 1;
-    if (previous >= 0) {
-      historyIndex.set(previous);
-      const song = songs().find((item) => item.song_path === history()[previous]);
-      if (song) void playSong(song, false);
+    const list = songs();
+    const previousHistoryIndex = historyIndex() - 1;
+    const previousHistorySong = list.find(
+      (song) => song.song_path === history()[previousHistoryIndex],
+    );
+    if (mode() === "random" && previousHistorySong) {
+      historyIndex.set(previousHistoryIndex);
+      void playSong(previousHistorySong, false);
       return;
     }
-    const list = songs();
-    if (!list.length) return;
-    const index = list.findIndex((song) => song.song_path === current()?.song_path);
-    void playSong(list[(index - 1 + list.length) % list.length]);
+    const song = selectPreviousSong(
+      list,
+      current()?.song_path ?? null,
+      mode(),
+      history(),
+      historyIndex(),
+    );
+    if (song) void playSong(song);
   }
 
   const pausePending = signal(false);
