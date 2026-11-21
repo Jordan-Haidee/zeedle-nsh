@@ -35,6 +35,13 @@ import type {
 } from "./types";
 import { sameSongPath, timeLabel } from "./format";
 
+const contentCornerStyle = {
+  borderRadius: 10,
+  borderTopRightRadius: 0,
+  borderBottomRightRadius: 0,
+  borderBottomLeftRadius: 0,
+};
+
 export function App() {
   const config = JSON.parse(AppConfig.load()) as AppConfigValue;
   const win = currentWindow();
@@ -694,7 +701,7 @@ export function App() {
               }}
               onLongPress={openActions}
               onContextMenu={() => openActions()}
-              class="h-7.5 flex-row items-center justify-between active:bg-pressed"
+              class="h-7.5 flex-row items-center justify-between"
               classList={{ "bg-hover": isPlaying(), "hover:bg-song-hover": !isPlaying() }}
             >
               <View class="w-[33%] justify-center">
@@ -744,7 +751,7 @@ export function App() {
 
   function GalleryPage() {
     return (
-      <View testID="screen-0" class="flex-1 min-h-0 bg-page">
+      <View testID="screen-0" class="flex-1 min-h-0">
         <View class="h-7.5 flex-row items-center justify-between">
           <View
             onPress={() => {
@@ -817,8 +824,8 @@ export function App() {
 
   function SearchPage() {
     return (
-      <View testID="screen-1" class="flex-1 min-h-0 bg-page">
-        <View class="h-10 flex-row items-center bg-page px-3">
+      <View testID="screen-1" class="flex-1 min-h-0">
+        <View class="h-10 flex-row items-center px-3">
           <View class="ml-0.75 mr-0.5 h-6 flex-1 flex-row items-center rounded-[3px] border-b-2 border-primary">
             <Input
               testID="song-search"
@@ -866,7 +873,7 @@ export function App() {
       <View
         testID="screen-2"
         onLayout={(event) => panelHeight.set(event.bounds.size.height)}
-        class="flex-1 min-h-0 flex-row bg-page"
+        class="flex-1 min-h-0 flex-row"
       >
         <View
           class="p-5 items-center justify-center"
@@ -923,7 +930,7 @@ export function App() {
                 <View
                   testID={active() ? "lyric-active" : `lyric-${index()}`}
                   onPress={() => seekTo(line().time)}
-                  class="h-10 items-center justify-center"
+                  class="h-10 items-center justify-center rounded-[5px] hover:bg-song-hover"
                 >
                   <Text
                     numberOfLines={1}
@@ -976,8 +983,8 @@ export function App() {
     );
 
     return (
-      <View testID="screen-3" class="flex-1 min-h-0 bg-page">
-        <Scroll testID="settings-scroll" class="flex-1 bg-page" contentClass="p-6 gap-5">
+      <View testID="screen-3" class="flex-1 min-h-0">
+        <Scroll testID="settings-scroll" class="flex-1" contentClass="p-6 gap-5">
           <View class={cardClass}>
             <Text style={textStyle(12, mutedColor(), "600")}>{t("Playback", "播放")}</Text>
             <View class="h-px bg-divider" />
@@ -1065,7 +1072,7 @@ export function App() {
 
   function AboutPage() {
     return (
-      <View testID="screen-4" class="flex-1 items-center justify-center gap-2.5 bg-page">
+      <View testID="screen-4" class="flex-1 items-center justify-center gap-2.5">
         <Image src={cover} style={{ width: 120, height: 120 }} />
         <Text numberOfLines={2} style={{ ...textStyle(14, textColor()), textAlign: "center" }}>
           {`Zeedle\n${t("Music at the speed of a blink, designed for pure simplicity", "以眨眼般的速度享受音乐，追求纯粹简洁")}`}
@@ -1247,7 +1254,7 @@ export function App() {
     <View class="min-h-125 min-w-212.5 flex-1 flex-col overflow-hidden border border-border bg-page">
       <View
         desktop={{ windowDrag: true }}
-        class="min-h-10 flex-row items-center border-b border-border bg-panel"
+        class="min-h-10 flex-row items-center bg-panel"
         style={{
           height: titleBar().height || 40,
           paddingLeft: titleBar().left + 10,
@@ -1304,10 +1311,7 @@ export function App() {
       </View>
 
       <View style={{ flex: 1, minHeight: 0, flexDirection: "row" }}>
-        <View
-          class="border-r border-border bg-panel px-1.5 pt-2.25 pb-2.5"
-          style={{ width: expanded() ? 200 : 54 }}
-        >
+        <View class="bg-panel px-1.5 pt-2.25 pb-2.5" style={{ width: expanded() ? 200 : 54 }}>
           <View
             testID="sidebar-toggle"
             onPress={() => {
@@ -1339,8 +1343,8 @@ export function App() {
           <SideButton icon="circleHelp" label={t("About", "关于")} target={4} />
         </View>
 
-        <View class="relative flex-1 min-h-0 min-w-0 flex-col bg-page">
-          <View class="flex-1 min-h-0 bg-page">
+        <View class="relative flex-1 min-h-0 min-w-0 flex-col bg-panel">
+          <View class="flex-1 min-h-0 overflow-hidden bg-page" style={contentCornerStyle}>
             {page() === 0 ? <GalleryPage /> : null}
             {page() === 1 ? <SearchPage /> : null}
             {page() === 2 ? <LyricsPage /> : null}
