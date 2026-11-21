@@ -18,11 +18,12 @@ import { Checkbox as NshCheckbox, Input } from "nsh/base";
 import { ProgressSlider } from "./components/ProgressSlider";
 import { PlayerTransportButton, VolumeControl } from "./components/PlayerControls";
 import { Text } from "./components/Text";
-import { currentWindow, Menu, titleBar } from "nsh/desktop";
+import { currentWindow, Menu, Tray, titleBar } from "nsh/desktop";
 import { AppConfig, Music } from "zeedle-nsh/native";
 import { LucideIcon, type LucideName } from "./icons";
 import cover from "../assets/cover.svg";
 import { translate, type Language } from "./translations";
+import { createTrayOptions } from "./tray";
 import type {
   AppConfigValue,
   LyricItem,
@@ -41,7 +42,9 @@ export function App() {
     title: "Zeedle",
     titleBar: { style: "hidden", height: 40 },
     minSize: { width: 850, height: 500 },
+    closeOnPress: false,
   });
+  win.on("closePress", () => win.hide());
   const page = signal<Page>(Math.max(0, Math.min(4, config.current_page)) as Page);
   const expanded = signal(config.sidebar_expanded);
   const light = () => colorScheme() === "light";
@@ -204,6 +207,8 @@ export function App() {
       loading.set(false);
     }
   }
+
+  Tray.set(createTrayOptions(win, () => void refreshSongs(), t));
 
   async function playSong(song: SongInfo, addHistory = true) {
     current.set(song);
@@ -1286,7 +1291,9 @@ export function App() {
               <LucideIcon name="square" size={12} color={secondaryColor()} />
             </View>
             <View
-              onPress={() => win.close()}
+              testID="window-close"
+              accessibilityLabel={t("Hide window", "隐藏窗口")}
+              onPress={() => win.hide()}
               class="h-10 w-10.5 items-center justify-center"
               hoverStyle={{ backgroundColor: "#e81123" }}
             >

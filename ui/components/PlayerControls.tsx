@@ -1,5 +1,6 @@
 import { Image, View, signal, token } from "nsh";
 import type { Signal } from "nsh";
+import { Slider } from "nsh/base";
 import { Music } from "zeedle-nsh/native";
 import { LucideIcon, type LucideName } from "../icons";
 
@@ -53,46 +54,51 @@ type VolumeControlProps = {
 
 export function VolumeControl(props: VolumeControlProps) {
   const hovered = signal(false);
-  const setVolumeAt = (y: number) => {
-    props.onVolumeChange(Math.max(0, Math.min(1, 1 - y / 55)));
-  };
+  const dragging = signal(false);
+  const previewVolume = signal(props.volume());
   return (
     <View
       class="relative h-17 w-full items-center justify-center"
-      onMouseEnter={() => hovered.set(true)}
-      onMouseLeave={() => hovered.set(false)}
+      onMouseEnter={() => {
+        previewVolume.set(props.volume());
+        hovered.set(true);
+      }}
+      onMouseLeave={() => {
+        if (!dragging()) hovered.set(false);
+      }}
     >
       {hovered() ? (
-        <View
+        <Slider
           accessibilityLabel={props.volumeLabel}
-          accessibilityValue={{ min: 0, max: 1, now: props.volume() }}
-          role="adjustable"
-          onPress={(event) => setVolumeAt(event?.position.y ?? 27.5)}
+          value={previewVolume()}
+          min={0}
+          max={1}
+          step={0}
+          axis="vertical"
+          onChange={({ value }) => {
+            if (typeof value === "number") {
+              dragging.set(true);
+              previewVolume.set(value);
+            }
+          }}
+          onChangeEnd={({ value }) => {
+            if (typeof value === "number") {
+              previewVolume.set(value);
+              props.onVolumeChange(value);
+            }
+            dragging.set(false);
+          }}
           class="absolute right-3.25 top-1.5 h-13.75 w-5"
-        >
-          <View
-            class="pointer-events-none absolute left-2 top-0 h-13.75 w-1 rounded-full"
-            style={{ backgroundColor: token("track") }}
-          >
-            <View
-              class="absolute bottom-0 left-0 w-1 rounded-full"
-              style={{ height: 55 * props.volume(), backgroundColor: token("primary") }}
-            />
-            <View
-              class="absolute -left-0.75 h-2.5 w-2.5 rounded-full border"
-              style={{
-                bottom: Math.max(0, Math.min(50, 55 * props.volume() - 5)),
-                borderColor: token("page"),
-                backgroundColor: token("primary"),
-              }}
-            />
-          </View>
-        </View>
+          trackClass="h-13.75 w-5 justify-center bg-transparent"
+          indicatorClass="h-full w-1 rounded-full bg-track"
+          rangeClass="w-1 rounded-full bg-primary"
+          thumbClass="size-2.5 rounded-full border border-page bg-primary"
+        />
       ) : null}
       <View
         accessibilityLabel={props.muteLabel}
         onPress={() => props.onVolumeChange(props.volume() > 0 ? 0 : 0.8)}
-        class="flex h-7.5 w-7 items-center justify-center hover:bg-hover active:bg-pressed"
+        class="flex h-7.5 w-7 items-center justify-center active:bg-pressed"
       >
         <LucideIcon
           name="volume2"

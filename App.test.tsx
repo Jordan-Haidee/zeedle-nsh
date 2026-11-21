@@ -1,5 +1,6 @@
 import { expect, open, test } from "nsh/test";
 import { AppConfig, Music } from "zeedle-nsh/native";
+import { createTrayOptions } from "./ui/tray";
 import "./tests/restore-app-config";
 
 const musicDirectory = Music.defaultDirectory();
@@ -81,6 +82,58 @@ test("native browser opener rejects unsafe schemes without launching", async () 
   expect(await Music.openUrl("javascript:alert(1)")).toBe(
     "Only HTTP and HTTPS links can be opened",
   );
+});
+
+test("tray actions restore the window, rescan songs, and expose exit", () => {
+  const calls: string[] = [];
+  const options = createTrayOptions(
+    {
+      show: () => calls.push("show"),
+      focus: () => calls.push("focus"),
+    },
+    () => calls.push("rescan"),
+    (english) => english,
+  );
+
+  options.onClick?.({ bounds: null });
+  const showItem = options.menu?.[0];
+  const rescanItem = options.menu?.[1];
+  if (showItem && "onSelect" in showItem) showItem.onSelect?.();
+  if (rescanItem && "onSelect" in rescanItem) rescanItem.onSelect?.();
+
+  expect(calls).toEqual(["show", "focus", "show", "focus", "rescan"]);
+  expect(options.menu?.[3]).toMatchObject({ label: "Exit", role: "quit" });
+});
+
+test("closing the window hides it while keeping the app state alive", async () => {
+  const app = await openApp({
+    width: 900,
+    height: 510,
+    platform: "windows",
+    storage: { "zeedle.light-theme": "false" },
+  });
+  await app.waitFor("id:screen-0");
+  await app.press("id:nav-3");
+  await app.waitFor("id:screen-3");
+  await app.waitUntil(() => savedConfig().current_page === 3);
+
+  const window = app.window("main");
+  await window.pressClose();
+
+  expect(window.state()?.visible).toBe(false);
+  expect(window.state() !== null).toBe(true);
+  expect(savedConfig().current_page).toBe(3);
+});
+
+test("the custom title bar close button hides the window", async () => {
+  const app = await openApp({ width: 900, height: 510, platform: "windows" });
+  await app.waitFor("id:screen-0");
+  const window = app.window("main");
+
+  await app.press("id:window-close");
+
+  expect(window.state()?.visible).toBe(false);
+  expect(window.state() !== null).toBe(true);
 });
 
 test("repeat and shuffle replace each other and toggle back to order", async () => {
@@ -342,6 +395,35 @@ test("dragging the progress slider seeks when the drag ends", async () => {
   await app.wait(150);
   const after = (JSON.parse(Music.state()) as { position: number }).position;
   expect(after > before + 5).toBe(true);
+});
+
+test("dragging the volume slider changes playback volume when the drag ends", async () => {
+  const app = await openApp({
+    width: 900,
+    height: 510,
+    platform: "windows",
+    colorScheme: "dark",
+    storage: {
+      "zeedle.music-directory": musicDirectory,
+      "zeedle.light-theme": "false",
+      "zeedle.show-spectrum": "false",
+    },
+  });
+
+  await app.waitFor("text:一眼万年");
+  await app.hover("label:Mute");
+  await app.waitFor("label:Volume");
+  await app.wait(150);
+  const before = (JSON.parse(Music.state()) as { volume: number }).volume;
+  await app.dragAndHold("label:Volume", { x: 0, y: 20 });
+  await app.wait(150);
+  const during = (JSON.parse(Music.state()) as { volume: number }).volume;
+  expect(Math.abs(during - before) < 0.01).toBe(true);
+  await app.drop();
+  await app.waitUntil(() => {
+    const volume = (JSON.parse(Music.state()) as { volume: number }).volume;
+    return Math.abs(volume - before) > 0.1;
+  });
 });
 
 test("mounted settings restyle when the system appearance changes", async () => {

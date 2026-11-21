@@ -20,10 +20,11 @@ Zeedle is a lightweight desktop music player focused on your local library. This
 ## Features
 
 - Browse and search local MP3, FLAC, WAV and OGG files.
-- Follow synchronized lyrics and seek by clicking a lyric line.
+- Follow embedded lyrics or adjacent LRC files, and seek by clicking a lyric line.
 - View a live audio spectrum while music plays.
 - Edit song metadata, album art and lyrics from the library.
 - Choose playback order, repeat or shuffle; use keyboard shortcuts for playback and navigation.
+- Close the window to keep Zeedle running in the system tray; show it again, rescan or exit from the tray menu.
 - Switch between English, Chinese, Spanish, French, German and Russian, and follow the system theme.
 
 ## Development setup

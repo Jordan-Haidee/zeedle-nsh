@@ -68,19 +68,33 @@ pub(crate) fn scan(path: &Path) -> Vec<SongInfo> {
 }
 
 pub(crate) fn read_lyrics(path: &Path) -> Vec<LyricItem> {
-    let Ok(tagged) = lofty::read_from_path(path) else {
-        return Vec::new();
-    };
-    let Some(text) = tagged
-        .primary_tag()
-        .and_then(|tag| {
-            tag.get(ItemKey::UnsyncLyrics)
-                .or_else(|| tag.get(ItemKey::Lyrics))
+    let embedded = lofty::read_from_path(path)
+        .ok()
+        .and_then(|tagged| {
+            tagged
+                .primary_tag()
+                .and_then(|tag| {
+                    tag.get(ItemKey::UnsyncLyrics)
+                        .or_else(|| tag.get(ItemKey::Lyrics))
+                })
+                .and_then(|item| item.value().text())
+                .map(str::to_owned)
         })
-        .and_then(|item| item.value().text())
-    else {
+        .map(|text| parse_lyrics(&text))
+        .filter(|lyrics| !lyrics.is_empty())
+        .unwrap_or_default();
+    if !embedded.is_empty() {
+        return embedded;
+    }
+
+    let sidecar_path = path.with_extension("lrc");
+    let Ok(text) = read_external_lyrics(&sidecar_path) else {
         return Vec::new();
     };
+    parse_lyrics(&text)
+}
+
+fn parse_lyrics(text: &str) -> Vec<LyricItem> {
     let mut lines: Vec<_> = text
         .trim_start_matches('\u{feff}')
         .lines()
@@ -109,6 +123,45 @@ pub(crate) fn read_lyrics(path: &Path) -> Vec<LyricItem> {
         last.duration = 100.0;
     }
     lines
+}
+
+#[cfg(test)]
+mod tests {
+    use super::read_lyrics;
+    use std::{fs, time::SystemTime};
+
+    #[test]
+    fn reads_adjacent_lrc_when_audio_has_no_embedded_lyrics() {
+        let unique = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!("zeedle-lyrics-{unique}"));
+        fs::create_dir(&directory).unwrap();
+        let audio = directory.join("song.wav");
+        let lyrics = audio.with_extension("lrc");
+        let mut wav = Vec::from(*b"RIFF");
+        wav.extend(36_u32.to_le_bytes());
+        wav.extend(*b"WAVEfmt ");
+        wav.extend(16_u32.to_le_bytes());
+        wav.extend(1_u16.to_le_bytes());
+        wav.extend(1_u16.to_le_bytes());
+        wav.extend(44_100_u32.to_le_bytes());
+        wav.extend(88_200_u32.to_le_bytes());
+        wav.extend(2_u16.to_le_bytes());
+        wav.extend(16_u16.to_le_bytes());
+        wav.extend(*b"data");
+        wav.extend(0_u32.to_le_bytes());
+        fs::write(&audio, wav).unwrap();
+        fs::write(&lyrics, "[00:01.25]Sidecar lyric\n").unwrap();
+
+        let result = read_lyrics(&audio);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].time, 1.25);
+        assert_eq!(result[0].text, "Sidecar lyric");
+        fs::remove_dir_all(directory).unwrap();
+    }
 }
 
 fn cover_picture(tag: &Tag) -> Option<&Picture> {
