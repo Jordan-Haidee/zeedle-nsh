@@ -8,6 +8,8 @@
 
 - `nsh run` starts the app with hot reload.
 - `nsh check -v` checks the TSX app and Rust crate; `nsh test App.test.tsx` runs app behavior tests.
+- `bun run scripts/check-tailwind-lsp.ts` runs the Tailwind language server over all project TS/TSX using the repository-owned `tailwind-lsp.config.json` rules.
+- `bun run scripts/test_config_persistence.ts` runs the isolated config-persistence integration test and its temporary WAV fixture.
 - `cargo test --locked` runs Rust tests; `cargo fmt --check` checks Rust formatting.
 - For GUI screenshots, run the app entry through the platform test host, for example `nsh test App.tsx --target windows`, and send `await app.screenshot("target/screen.png")` through stdin. This captures the app surface through NSH; do not capture the shared desktop. If an offscreen renderer is unavailable for a change, record the limitation instead of switching to an on-screen capture.
 - `nsh package App.tsx --target windows` creates the Windows package and, with Inno Setup 6 installed, a `*-setup.exe` installer. Use `nsh package --target linux` or `nsh package --target macos` on the corresponding platform.
@@ -31,7 +33,7 @@ App tests use songs and lyric metadata from the default Music folder. The README
 
 ## Coding Style
 
-Use two spaces in TSX and JSON; run `cargo fmt` after Rust edits. Use PascalCase for React components and Rust types, and camelCase for functions and variables. Keep theme colors in `theme.json` and access them through NSH `token()` helpers. Keep app UI TSX/TS modules and UI-only SVG assets under `ui/`; map icons in `ui/icons.tsx` using kebab-case filenames.
+Use two spaces in TSX and JSON; run `cargo fmt` after Rust edits. `tsconfig.json` keeps unused locals/parameters, missing returns, and switch fallthrough as errors. Use PascalCase for React components and Rust types, and camelCase for functions and variables. Keep theme colors in `theme.json` and access them through NSH `token()` helpers. Keep app UI TSX/TS modules and UI-only SVG assets under `ui/`; map icons in `ui/icons.tsx` using kebab-case filenames.
 
 ## Tests and Reviews
 

@@ -483,10 +483,10 @@ export function App() {
         testID={`nav-${props.target}`}
         accessibilityLabel={props.label}
         onPress={() => navigateToPage(props.target)}
-        class="relative mb-[5px] h-[38px] flex-row items-center justify-start rounded-lg pl-[14px] pr-[10px] hover:bg-hover active:opacity-70"
+        class="relative mb-1.25 h-9.5 flex-row items-center justify-start rounded-lg pl-3.5 pr-2.5 hover:bg-hover active:opacity-70"
         classList={{ "bg-hover": selected(), "gap-2.5": expanded(), "gap-0": !expanded() }}
       >
-        {selected() ? <View class="pointer-events-none absolute left-[3px] top-[11px] h-4 w-[3px] rounded-sm" style={{ backgroundColor: accentColor() }} /> : null}
+        {selected() ? <View class="pointer-events-none absolute left-0.75 top-2.75 h-4 w-0.75 rounded-sm" style={{ backgroundColor: accentColor() }} /> : null}
         <View style={{ width: 20, height: 18, alignItems: "center", justifyContent: "center" }}>
           <LucideIcon name={props.icon} size={18} color={selected() ? accentColor() : secondaryColor()} />
         </View>
@@ -506,7 +506,7 @@ export function App() {
         class="flex-1 bg-page"
         contentStyle={{ paddingBottom: 0 }}
         empty={
-          <View class="flex-1 min-h-[220px] items-center justify-center gap-2">
+          <View class="flex-1 min-h-55 items-center justify-center gap-2">
             <LucideIcon name="search" size={24} color={mutedColor()} />
             <Text style={textStyle(13, mutedColor())}>{loading() ? t("Reading your music library…", "正在读取音乐库…") : t("No songs found in this folder", "此文件夹中没有歌曲")}</Text>
             <Text style={textStyle(12, mutedColor())}>{t("Choose a folder with MP3, FLAC, WAV or OGG files", "选择包含 MP3、FLAC、WAV 或 OGG 文件的文件夹")}</Text>
@@ -533,7 +533,7 @@ export function App() {
               }}
               onLongPress={openActions}
               onContextMenu={() => openActions()}
-              class="h-[30px] flex-row items-center justify-between active:bg-pressed"
+              class="h-7.5 flex-row items-center justify-between active:bg-pressed"
               classList={{ "bg-hover": isPlaying(), "hover:bg-song-hover": !isPlaying() }}
             >
           <View class="w-[33%] justify-center">
@@ -555,16 +555,16 @@ export function App() {
   function GalleryPage() {
     return (
       <View testID="screen-0" class="flex-1 min-h-0 bg-page">
-          <View class="h-[30px] flex-row items-center justify-between">
-          <View onPress={() => { if (sortField() === "song_name") ascending.set(!ascending()); else { sortField.set("song_name"); ascending.set(true); } }} class="w-[33%] flex-row items-center gap-[5px] hover:bg-hover">
+          <View class="h-7.5 flex-row items-center justify-between">
+          <View onPress={() => { if (sortField() === "song_name") ascending.set(!ascending()); else { sortField.set("song_name"); ascending.set(true); } }} class="w-[33%] flex-row items-center gap-1.25 hover:bg-hover">
             <Text style={{ ...textStyle(14, mutedColor()), marginLeft: "40%" }}>{t("Title", "标题")}</Text>
             {sortField() === "song_name" ? <LucideIcon name={ascending() ? "arrowUp" : "arrowDown"} size={12} color={mutedColor()} /> : null}
           </View>
-          <View onPress={() => { if (sortField() === "singer") ascending.set(!ascending()); else { sortField.set("singer"); ascending.set(true); } }} class="w-[33%] flex-row items-center gap-[5px] hover:bg-hover">
+          <View onPress={() => { if (sortField() === "singer") ascending.set(!ascending()); else { sortField.set("singer"); ascending.set(true); } }} class="w-[33%] flex-row items-center gap-1.25 hover:bg-hover">
             <Text style={{ ...textStyle(14, mutedColor()), marginLeft: "40%" }}>{t("Artist", "艺术家")}</Text>
             {sortField() === "singer" ? <LucideIcon name={ascending() ? "arrowUp" : "arrowDown"} size={12} color={mutedColor()} /> : null}
           </View>
-          <View onPress={() => { if (sortField() === "duration_secs") ascending.set(!ascending()); else { sortField.set("duration_secs"); ascending.set(true); } }} class="w-[33%] flex-row items-center gap-[5px] hover:bg-hover">
+          <View onPress={() => { if (sortField() === "duration_secs") ascending.set(!ascending()); else { sortField.set("duration_secs"); ascending.set(true); } }} class="w-[33%] flex-row items-center gap-1.25 hover:bg-hover">
             <Text style={{ ...textStyle(14, mutedColor()), marginLeft: "40%" }}>{t("Duration", "时长")}</Text>
             {sortField() === "duration_secs" ? <LucideIcon name={ascending() ? "arrowUp" : "arrowDown"} size={12} color={mutedColor()} /> : null}
           </View>
@@ -578,7 +578,7 @@ export function App() {
     return (
       <View testID="screen-1" class="flex-1 min-h-0 bg-page">
         <View class="h-10 flex-row items-center bg-page px-3">
-          <View class="ml-[3px] mr-[2px] h-6 flex-1 flex-row items-center rounded-[3px] border-b-2 border-primary">
+          <View class="ml-0.75 mr-0.5 h-6 flex-1 flex-row items-center rounded-[3px] border-b-2 border-primary">
             <Input
               testID="song-search"
               value={query()}
@@ -587,11 +587,11 @@ export function App() {
               class="h-6 flex-1 bg-transparent px-1 text-[13px]"
               style={{ color: textColor() }}
             />
-            {query() ? <View onPress={() => updateSearch("")} class="mr-[6px] p-[3px]"><LucideIcon name="x" size={14} color={mutedColor()} /></View> : null}
+            {query() ? <View onPress={() => updateSearch("")} class="mr-1.5 p-0.75"><LucideIcon name="x" size={14} color={mutedColor()} /></View> : null}
           </View>
         </View>
         {search() ? (
-          <View class="h-[26px] justify-center px-3">
+          <View class="h-6.5 justify-center px-3">
             <Text style={textStyle(12, mutedColor())}>{language() === "zh" ? `${searchResults().length} ${t("result(s) found", "个结果")}` : `${searchResults().length} ${t("result(s) found", "result(s) found")}`}</Text>
           </View>
         ) : null}
@@ -615,7 +615,7 @@ export function App() {
           <View class="max-w-full overflow-hidden rounded-lg bg-raised" style={{ width: albumSize(), height: albumSize(), boxShadow: `0 12px 28px ${shadowColor()}` }}>
             <Image src={art()} class="size-full" />
           </View>
-          <View class="mt-[5px] gap-[3px]" style={{ width: albumSize() }}>
+          <View class="mt-1.25 gap-0.75" style={{ width: albumSize() }}>
             <Text numberOfLines={1} style={{ ...textStyle(14, textColor()), textAlign: lyrics().length ? "left" : "center" }}>{t("Artist:", "艺术家：")} {current()?.singer ?? t("Unknown", "未知")}</Text>
             <Text numberOfLines={1} style={{ ...textStyle(14, textColor()), textAlign: lyrics().length ? "left" : "center" }}>{t("Title:", "歌曲：")} {current()?.song_name ?? t("No song", "无歌曲")}</Text>
           </View>
@@ -671,7 +671,7 @@ export function App() {
         accessibilityLabel={label}
         onChange={onPress}
         class="items-center justify-center"
-        indicatorClass="size-[18px] items-center justify-center rounded-sm border border-checkbox-border bg-transparent checked:border-primary checked:bg-primary"
+        indicatorClass="size-4.5 items-center justify-center rounded-sm border border-checkbox-border bg-transparent checked:border-primary checked:bg-primary"
         indicator={checked ? <LucideIcon name="check" size={15} color={token("primary-foreground")} /> : null}
       />
     );
@@ -722,7 +722,7 @@ export function App() {
                   onPress={() => {
                     language.set(option.code as Language);
                   }}
-                  class="h-[26px] min-w-0 flex-1 items-center justify-center rounded border border-input-border bg-hover"
+                  class="h-6.5 min-w-0 flex-1 items-center justify-center rounded border border-input-border bg-hover"
                   classList={{
                     "border-primary": language() === option.code,
                     "bg-primary": language() === option.code,
@@ -776,7 +776,7 @@ export function App() {
 
   function PlayerPanel() {
     return (
-      <View class="h-[72px] min-h-[72px] bg-page">
+      <View class="h-18 min-h-18 bg-page">
         <View
           testID="progress-seek"
           hitSlop={{ top: 8, bottom: 8 }}
@@ -798,11 +798,11 @@ export function App() {
             }}
           />
         </View>
-        <View class="h-[68px] flex-row items-center">
-          <View class="w-[35%] flex-row items-center gap-[3px]" onPress={() => navigateToPage(2)}>
+        <View class="h-17 flex-row items-center">
+          <View class="w-[35%] flex-row items-center gap-0.75" onPress={() => navigateToPage(2)}>
             <View class="w-[20%] items-center justify-center">
-              <View class="size-[40px] overflow-hidden rounded">
-                <Image src={art()} class="size-[40px]" />
+              <View class="size-10 overflow-hidden rounded">
+                <Image src={art()} class="size-10" />
               </View>
             </View>
             <View class="w-[80%]">
@@ -850,14 +850,14 @@ export function App() {
   }
 
   return (
-    <View class="min-h-[500px] min-w-[850px] flex-1 flex-col overflow-hidden border border-border bg-page">
+    <View class="min-h-125 min-w-212.5 flex-1 flex-col overflow-hidden border border-border bg-page">
       <View
         desktop={{ windowDrag: true }}
-        class="min-h-[40px] flex-row items-center border-b border-border bg-panel"
+        class="min-h-10 flex-row items-center border-b border-border bg-panel"
         style={{ height: titleBar().height || 40, paddingLeft: titleBar().left + 10, paddingRight: titleBar().right }}
       >
-        <View class="mr-[6px] size-[18px] overflow-hidden rounded">
-          <Image src={cover} class="size-[18px]" />
+        <View class="mr-1.5 size-4.5 overflow-hidden rounded">
+          <Image src={cover} class="size-4.5" />
         </View>
         <Text style={textStyle(13, textColor(), "600")}>Zeedle</Text>
         <View class="flex-1" />
@@ -866,7 +866,7 @@ export function App() {
             accessibilityLabel={t("Toggle theme", "切换主题")}
             disabled={followSystem()}
             disabledStyle={{ opacity: 0.4 }}
-            class="h-10 w-[42px] items-center justify-center hover:bg-hover"
+            class="h-10 w-10.5 items-center justify-center hover:bg-hover"
             onPress={() => {
               if (followSystem()) return;
               const next = !light();
@@ -878,13 +878,13 @@ export function App() {
         {titleBar().right === 0 ? (
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <View class="h-4 w-px bg-divider" />
-            <View onPress={() => win.minimize()} class="h-10 w-[42px] items-center justify-center hover:bg-hover">
+            <View onPress={() => win.minimize()} class="h-10 w-10.5 items-center justify-center hover:bg-hover">
             <LucideIcon name="minus" size={18} color={secondaryColor()} />
             </View>
-            <View onPress={() => win.setMode(win.state()?.mode === "maximized" ? "normal" : "maximized")} class="h-10 w-[42px] items-center justify-center hover:bg-hover">
+            <View onPress={() => win.setMode(win.state()?.mode === "maximized" ? "normal" : "maximized")} class="h-10 w-10.5 items-center justify-center hover:bg-hover">
             <LucideIcon name="square" size={12} color={secondaryColor()} />
             </View>
-            <View onPress={() => win.close()} class="h-10 w-[42px] items-center justify-center" hoverStyle={{ backgroundColor: "#e81123" }}>
+            <View onPress={() => win.close()} class="h-10 w-10.5 items-center justify-center" hoverStyle={{ backgroundColor: "#e81123" }}>
               <LucideIcon name="x" size={14} color={secondaryColor()} />
             </View>
           </View>
@@ -892,7 +892,7 @@ export function App() {
       </View>
 
       <View style={{ flex: 1, minHeight: 0, flexDirection: "row" }}>
-        <View class="border-r border-border bg-panel px-1.5 pt-[9px] pb-2.5" style={{ width: expanded() ? 200 : 54 }}>
+        <View class="border-r border-border bg-panel px-1.5 pt-2.25 pb-2.5" style={{ width: expanded() ? 200 : 54 }}>
           <View testID="sidebar-toggle" onPress={() => {
             LayoutAnimation.configureNext({
               duration: 200,
@@ -901,12 +901,12 @@ export function App() {
               delete: { type: "easeOut", property: "opacity", duration: 120 },
             });
             expanded.set(!expanded());
-          }} class="mb-2.5 h-9 flex-row items-center justify-start gap-2.5 rounded-lg pl-[14px] pr-[10px] hover:bg-hover">
-            <View class="h-[18px] w-5 items-center justify-center">
+          }} class="mb-2.5 h-9 flex-row items-center justify-start gap-2.5 rounded-lg pl-3.5 pr-2.5 hover:bg-hover">
+            <View class="h-4.5 w-5 items-center justify-center">
               <LucideIcon name={expanded() ? "panelLeftClose" : "panelLeftOpen"} size={18} color={secondaryColor()} />
             </View>
           </View>
-          <View class="h-[5px]" />
+          <View class="h-1.25" />
           <SideButton icon="listMusic" label={t("Gallery", "曲库")} target={0} />
           <SideButton icon="search" label={t("Search", "搜索")} target={1} />
           <SideButton icon="captions" label={t("Lyrics", "歌词")} target={2} />
@@ -926,8 +926,8 @@ export function App() {
           </View>
           {page() === 0 ? <PlayerPanel /> : null}
           {showSpectrum() ? (
-            <View class="pointer-events-none absolute bottom-0 left-0 right-0 z-[5] h-[60px] items-center justify-end">
-              <View class="h-[60px] w-1/2 flex-row items-end opacity-30">
+            <View class="pointer-events-none absolute bottom-0 left-0 right-0 z-5 h-15 items-center justify-end">
+              <View class="h-15 w-1/2 flex-row items-end opacity-30">
                 {spectrumBars().map((bar) => <View class="flex-1 rounded-[1px] bg-primary" style={{ height: Math.max(0, Math.min(1, bar)) * 60 }} />)}
               </View>
             </View>
@@ -944,7 +944,7 @@ export function App() {
 
       {editingSong() ? (
         <View class="absolute inset-0 z-20 items-center justify-center p-2.5">
-          <View class="h-[450px] w-[520px] max-h-[96%] max-w-[96%] gap-[7.5px] rounded-lg border border-border bg-page px-4 pt-[14px] pb-4">
+          <View class="h-112.5 w-130 max-h-[96%] max-w-[96%] gap-[7.5px] rounded-lg border border-border bg-page px-4 pt-3.5 pb-4">
             <Text style={textStyle(18, textColor(), "600")}>{t("Edit song metadata", "编辑歌曲元信息")}</Text>
             <View style={{ gap: 4 }}>
               <Text style={textStyle(14, secondaryColor())}>{t("Song title", "歌曲名")}</Text>
@@ -961,19 +961,19 @@ export function App() {
               </View>
             </View>
             <View style={{ height: 200, minHeight: 200, marginTop: -1, flexDirection: "row", gap: 10 }}>
-              <View class="min-w-0 flex-1 gap-1.5 rounded-lg border border-border bg-panel pt-2 pb-2.5 pl-2 pr-[10px]">
+              <View class="min-w-0 flex-1 gap-1.5 rounded-lg border border-border bg-panel pt-2 pb-2.5 pl-2 pr-2.5">
                 <Text style={textStyle(14, textColor(), "600")}>{t("Album cover", "专辑封面")}</Text>
                 <View class="-mt-px min-h-0 flex-row items-start">
-                  <Image src={editCoverPreview()} class="size-[100px]" />
+                  <Image src={editCoverPreview()} class="size-25" />
                 </View>
                 <View onPress={() => void chooseEditCover()} class="h-8 items-center justify-center rounded bg-raised">
                   <Text style={textStyle(13, textColor())}>{t("Select cover image", "选择封面图片")}</Text>
                 </View>
                 <Text style={textStyle(11, mutedColor())}>{editCoverPath() ? editCoverName() : t("Existing cover will be kept", "将保留现有封面")}</Text>
               </View>
-              <View class="min-w-0 flex-1 gap-1.5 rounded-lg border border-border bg-panel px-[10px] pt-2 pb-2.5">
+              <View class="min-w-0 flex-1 gap-1.5 rounded-lg border border-border bg-panel px-2.5 pt-2 pb-2.5">
                 <Text style={textStyle(14, textColor(), "600")}>{t("Lyrics", "歌词")}</Text>
-                <Scroll class="-mt-px h-[100px] min-h-[100px] rounded bg-raised p-2">
+                <Scroll class="-mt-px h-25 min-h-25 rounded bg-raised p-2">
                   {(editLyricsPreview() || t("No embedded lyrics", "没有内嵌歌词")).split(/\r?\n/).map((line) => (
                   <Text numberOfLines={1} style={{ ...textStyle(11, textColor()), lineHeight: 13 }}>{line}</Text>
                   ))}
@@ -988,10 +988,10 @@ export function App() {
           <View class="flex-1" />
             <View class="h-px bg-divider" />
             <View class="flex-row justify-end gap-2">
-              <View testID="edit-cancel" onPress={() => editingSong.set(null)} class="h-8 w-[68px] items-center justify-center rounded bg-raised">
+              <View testID="edit-cancel" onPress={() => editingSong.set(null)} class="h-8 w-17 items-center justify-center rounded bg-raised">
                 <Text style={textStyle(13, textColor())}>{t("Cancel", "取消")}</Text>
               </View>
-              <View onPress={() => void saveEdit()} class="h-8 w-[55px] items-center justify-center rounded bg-button" style={{ opacity: editSaving() ? 0.65 : 1 }}>
+              <View onPress={() => void saveEdit()} class="h-8 w-13.75 items-center justify-center rounded bg-button" style={{ opacity: editSaving() ? 0.65 : 1 }}>
                 <Text style={textStyle(13, textColor(), "500")}>{editSaving() ? t("Saving…", "正在保存…") : t("Save", "保存")}</Text>
               </View>
             </View>
@@ -1000,16 +1000,16 @@ export function App() {
       ) : null}
 
       {deleteTarget() ? (
-        <View class="absolute inset-0 z-[21] items-center justify-center p-5">
-          <View class="w-[370px] max-w-full gap-[11px] rounded-lg border border-border bg-page p-5">
+        <View class="absolute inset-0 z-21 items-center justify-center p-5">
+          <View class="w-92.5 max-w-full gap-2.75 rounded-lg border border-border bg-page p-5">
             <Text style={textStyle(17, textColor(), "600")}>{t("Delete this song?", "删除这首歌曲？")}</Text>
             <Text style={textStyle(13, textColor(), "500")}>{deleteTarget()?.song_name}</Text>
             <Text numberOfLines={2} style={textStyle(11, secondaryColor())}>{t("The audio file will be removed from your device.", "此音频文件将从设备中删除。")}</Text>
             <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 5 }}>
-              <View testID="delete-cancel" onPress={() => deleteTarget.set(null)} class="rounded bg-raised px-[13px] py-2">
+              <View testID="delete-cancel" onPress={() => deleteTarget.set(null)} class="rounded bg-raised px-3.25 py-2">
                 <Text style={textStyle(12, secondaryColor(), "500")}>{t("Cancel", "取消")}</Text>
               </View>
-              <View onPress={() => void confirmDelete()} class="rounded bg-danger px-[14px] py-2">
+              <View onPress={() => void confirmDelete()} class="rounded bg-danger px-3.5 py-2">
                 <Text style={textStyle(12, token("destructive-foreground"), "600")}>{t("Delete song", "删除歌曲")}</Text>
               </View>
             </View>

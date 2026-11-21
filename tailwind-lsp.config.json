@@ -1,0 +1,28 @@
+{
+  "classAttributes": [
+    "class",
+    "className",
+    "ngClass",
+    "class:list",
+    "classList",
+    "contentClass",
+    "trackClass",
+    "indicatorClass",
+    "rangeClass",
+    "thumbClass"
+  ],
+  "validate": true,
+  "lint": {
+    "cssConflict": "warning",
+    "invalidApply": "error",
+    "invalidScreen": "error",
+    "invalidVariant": "error",
+    "deprecatedAtRule": "warning",
+    "invalidConfigPath": "error",
+    "invalidTailwindDirective": "error",
+    "invalidSourceDirective": "error",
+    "recommendedVariantOrder": "warning",
+    "usedBlocklistedClass": "warning",
+    "suggestCanonicalClasses": "warning"
+  }
+}

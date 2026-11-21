@@ -19,10 +19,10 @@ export function ProgressSlider(props: ProgressSliderProps) {
       step={0}
       onChange={({ value }) => props.onChange(value as number)}
       onChangeEnd={({ value }) => props.onChangeEnd(value as number)}
-      class="my-[-10px] h-6 w-full"
+      class="-my-2.5 h-6 w-full"
       trackClass="h-6 justify-center bg-transparent"
       indicatorClass="h-1 bg-track"
-      rangeClass="h-[3px] bg-primary"
+      rangeClass="h-0.75 bg-primary"
       thumbClass="size-5 rounded-full border-[3px] border-track-thumb-border bg-primary"
     />
   );

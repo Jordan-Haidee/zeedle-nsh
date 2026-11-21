@@ -218,7 +218,6 @@ test("playback keeps the active lyric in the visible list", async () => {
   if (!song) throw new Error("Love Story fixture was not found");
   const lyricItems = JSON.parse(await Music.lyrics(song.song_path)) as { time: number }[];
   const targetTime = Math.max(...lyricItems.filter((line) => line.time <= 90).map((line) => line.time));
-  const targetIndex = lyricItems.reduce((last, line, index) => line.time === targetTime ? index : last, -1);
   const steps = new Set(lyricItems.filter((line) => line.time > 0 && line.time <= targetTime).map((line) => line.time)).size;
   const app = await openApp( {
     width: 900,
