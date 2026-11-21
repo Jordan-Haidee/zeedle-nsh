@@ -1,7 +1,7 @@
 import { Image, View, signal, token } from "nsh";
 import type { Signal } from "nsh";
 import { Music } from "zeedle-nsh/native";
-import { LucideIcon, type LucideName } from "../../icons";
+import { LucideIcon, type LucideName } from "../icons";
 
 type TransportButtonProps = {
   testID: string;

@@ -1,6 +1,6 @@
 # Zeedle interface notes
 
-Zeedle keeps its existing compact desktop layout, theme tokens, typography, spacing, icon family and interaction states. `theme.json` remains the source for app colors. The app's UI helpers live in `app/ui/`; screens keep their current composition in `AppView.tsx`.
+Zeedle keeps its existing compact desktop layout, theme tokens, typography, spacing, icon family and interaction states. `theme.json` remains the source for app colors. UI code and UI-only SVGs live under `ui/`: `AppView.tsx` composes screens, `components/` contains shared controls, `icons.tsx` maps `icons/`, and `translations.ts`, `types.ts` and `format.ts` hold shared UI resources.
 
 ## Player panel motion inventory
 

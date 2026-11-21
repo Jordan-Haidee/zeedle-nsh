@@ -2,7 +2,7 @@
 
 ## Project Structure
 
-`App.tsx` contains the NSH interface and player state; `App.test.tsx` covers app behavior. Native Rust audio and metadata code lives in `src/lib.rs`, with spectrum processing in `src/spectrum.rs`. `icons.tsx` maps names to SVGs under `assets/icons/`; `theme.json` defines theme tokens. Cross-platform UI tests are in `tests/`, platform validation scripts in `scripts/`, and CI workflows in `.github/workflows/`. Screenshots used by the README live in `docs/screenshots/`.
+`App.tsx` is the NSH entry point; `ui/` contains the TSX interface, UI components, icons and their SVG assets, translations, and view types. `App.test.tsx` covers app behavior. Native Rust audio and metadata code lives in `src/lib.rs`, `src/audio.rs`, and `src/library.rs`, with spectrum processing in `src/spectrum.rs`. `theme.json` defines theme tokens. Cross-platform UI tests are in `tests/`, platform validation scripts in `scripts/`, and CI workflows in `.github/workflows/`. Screenshots used by the README live in `docs/screenshots/`.
 
 ## Build, Test, and Package
 
@@ -31,7 +31,7 @@ App tests use songs and lyric metadata from the default Music folder. The README
 
 ## Coding Style
 
-Use two spaces in TSX and JSON; run `cargo fmt` after Rust edits. Use PascalCase for React components and Rust types, and camelCase for functions and variables. Keep theme colors in `theme.json` and access them through NSH `token()` helpers. Add icons through `icons.tsx` using the existing Lucide SVG assets and kebab-case filenames.
+Use two spaces in TSX and JSON; run `cargo fmt` after Rust edits. Use PascalCase for React components and Rust types, and camelCase for functions and variables. Keep theme colors in `theme.json` and access them through NSH `token()` helpers. Keep app UI TSX/TS modules and UI-only SVG assets under `ui/`; map icons in `ui/icons.tsx` using kebab-case filenames.
 
 ## Tests and Reviews
 

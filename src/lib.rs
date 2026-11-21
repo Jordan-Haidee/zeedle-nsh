@@ -93,10 +93,10 @@ impl Music {
     /// Color the original Lucide SVG before decoding, avoiding native bitmap tint transforms.
     pub fn transport_icon(name: String, color: String) -> String {
         let svg = match name.as_str() {
-            "play" => include_str!("../assets/icons/play.svg"),
-            "pause" => include_str!("../assets/icons/pause.svg"),
-            "skipBack" => include_str!("../assets/icons/skip-back.svg"),
-            "skipForward" => include_str!("../assets/icons/skip-forward.svg"),
+            "play" => include_str!("../ui/icons/play.svg"),
+            "pause" => include_str!("../ui/icons/pause.svg"),
+            "skipBack" => include_str!("../ui/icons/skip-back.svg"),
+            "skipForward" => include_str!("../ui/icons/skip-forward.svg"),
             _ => return String::new(),
         };
         format!(

@@ -82,7 +82,7 @@ The platform render test captures the library, settings and About screens from e
 
 - `App.tsx` — TSX interface and the default entry for `nsh run`.
 - `src/lib.rs` and `src/spectrum.rs` — audio playback, metadata, browser links and spectrum analysis.
-- `assets/icons/` — Lucide SVG interface icons.
+- `ui/icons/` — Lucide SVG interface icons.
 - `theme.json` — light and dark theme tokens.
 
 The original Zeedle project is maintained at [Jordan-Haidee/zeedle](https://github.com/Jordan-Haidee/zeedle). This repository is its NSH port; it is not the original Slint application.

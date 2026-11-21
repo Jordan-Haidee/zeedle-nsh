@@ -1,4 +1,4 @@
 import { mount } from "nsh";
-import { App } from "./AppView";
+import { App } from "./ui/AppView";
 
 mount(App);

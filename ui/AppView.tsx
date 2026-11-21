@@ -1,15 +1,15 @@
 import { cleanup, effect, Image, LayoutAnimation, List, Scroll, Storage, View, colorScheme, keymap, setColorScheme, signal, token, type ListRef } from "nsh";
 import { Checkbox as NshCheckbox, Input } from "nsh/base";
-import { ProgressSlider } from "./app/ui/ProgressSlider";
-import { PlayerTransportButton, VolumeControl } from "./app/ui/PlayerControls";
-import { Text } from "./app/ui/Text";
+import { ProgressSlider } from "./components/ProgressSlider";
+import { PlayerTransportButton, VolumeControl } from "./components/PlayerControls";
+import { Text } from "./components/Text";
 import { currentWindow, Menu, titleBar } from "nsh/desktop";
 import { AppConfig, Music } from "zeedle-nsh/native";
 import { LucideIcon, type LucideName } from "./icons";
-import cover from "./assets/cover.svg";
+import cover from "../assets/cover.svg";
 import { translate, type Language } from "./translations";
-import type { AppConfigValue, LyricItem, Page, PlaybackState, PlayMode, SongInfo, SortField } from "./app/types";
-import { sameSongPath, timeLabel } from "./app/format";
+import type { AppConfigValue, LyricItem, Page, PlaybackState, PlayMode, SongInfo, SortField } from "./types";
+import { sameSongPath, timeLabel } from "./format";
 
 export function App() {
   const config = JSON.parse(AppConfig.load()) as AppConfigValue;
