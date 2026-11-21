@@ -26,21 +26,98 @@ Zeedle is a lightweight desktop music player focused on your local library. This
 - Choose playback order, repeat or shuffle; use keyboard shortcuts for playback and navigation.
 - Switch between English, Chinese, Spanish, French, German and Russian, and follow the system theme.
 
+## Development setup
+
+Zeedle uses NSH 0.6.1 and Rust for its native audio backend. Bun runs the TypeScript formatter, linter and helper scripts. Install the tools below for your platform, then clone this repository.
+
+### Windows
+
+Use Windows 10 version 1809 or later. Install:
+
+1. [Git for Windows](https://git-scm.com/download/win).
+2. [Rust through rustup](https://www.rust-lang.org/tools/install). In the installer, choose the MSVC toolchain and install the Visual Studio C++ Build Tools with the Windows SDK when prompted. Then open PowerShell and select stable Rust:
+
+   ```powershell
+   rustup toolchain install stable
+   rustup default stable
+   ```
+
+3. The [NSH CLI](https://nsh.dev/docs/installation/), pinned to the version used by this repository's CI:
+
+   ```powershell
+   $env:NSH_VERSION = 'v0.6.1'
+   irm https://nsh.dev/install.ps1 | iex
+   ```
+
+   Open a new terminal after installation so the updated `PATH` is picked up. Install LLVM for `libclang` as described in NSH's [Windows prerequisites](https://nsh.dev/docs/installation/); if LLVM is outside `C:\Program Files\LLVM`, set `LIBCLANG_PATH` to its `bin` directory.
+4. [Bun](https://bun.com/docs/installation):
+
+   ```powershell
+   irm https://bun.sh/install.ps1 | iex
+   ```
+
+### macOS and Linux
+
+Install Git, stable Rust via [rustup](https://www.rust-lang.org/tools/install), and [Bun](https://bun.com/docs/installation). Install the repository's NSH version with the official installer:
+
+```sh
+export NSH_VERSION=v0.6.1
+curl -fsSL https://nsh.dev/install.sh | sh
+```
+
+For platform requirements, see the [NSH installation guide](https://nsh.dev/docs/installation/). macOS development requires Xcode Command Line Tools. On Ubuntu 24.04, this project's Linux build needs GTK 4, WebKitGTK 6, GStreamer and the development packages listed in [the CI workflow](.github/workflows/cross-platform.yml).
+
+### Clone and configure
+
+From PowerShell, or the terminal for your platform:
+
+```sh
+git clone https://github.com/Jordan-Haidee/zeedle-nsh.git
+cd zeedle-nsh
+bun install --frozen-lockfile
+git config core.hooksPath .githooks
+```
+
+The Git hook checks staged TS/TSX formatting and lint, then runs `nsh check` before each commit. Configure the hook once for each clone. `bun install` installs the project's local Oxfmt and Oxlint tools; Node.js is not required for them.
+
+Check the installed tools and source:
+
+```sh
+nsh --version # expected: 0.6.1
+rustc --version
+bun --version
+bun run fmt:check
+bun run lint
+nsh check -v
+```
+
 ## Build and run
 
-Install the [NSH CLI](https://nsh.dev/docs/) and a Rust toolchain, then run:
+After setup, run the app in its native desktop window:
 
 ```sh
 nsh run
 ```
 
-The app directory starts the TSX interface in `App.tsx`. On Windows, use `nsh run --window-size 900x510` to set the initial window size.
+The app directory starts the TSX interface in `App.tsx`. On Windows, use `nsh run --window-size 900x510` to set the initial window size. To run the UI tests, use `nsh test App.test.tsx`; playback tests need the local music fixtures listed below.
 
-To check the app and run its tests:
+For an offscreen GUI screenshot on Windows, run the app entry through NSH's test host:
+
+```powershell
+@'
+await app.waitFor("id:screen-0");
+await app.screenshot("target/dev-check.png");
+'@ | nsh test App.tsx --target windows
+```
+
+This captures the app through the test host and saves the image under the ignored `target/` directory.
+
+To build a Windows setup installer, install [Inno Setup 6](https://jrsoftware.org/isinfo.php) and run `nsh package App.tsx --target windows`. It is not needed for `nsh run`.
+
+To run the Tailwind language-server check:
 
 ```sh
-nsh check -v
-nsh test App.test.tsx
+bun run scripts/check-tailwind-lsp.ts
 ```
 
 Playback integration tests use songs from the default Music folder, including **一眼万年**, **万疆**, **Deadman** and **Love Story**. Keep those tracks and their lyric metadata available when running the full suite; no copyrighted audio is included in this repository.
