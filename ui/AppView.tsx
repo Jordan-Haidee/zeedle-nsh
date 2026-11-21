@@ -1097,7 +1097,7 @@ export function App() {
         </View>
         <Text numberOfLines={2} style={{ ...textStyle(14, textColor()), textAlign: "center" }}>
           {t("Author:", "作者：")} Jordan Haidee{"\n"}
-          {t("Version:", "版本：")} 0.2.4
+          {t("Version:", "版本：")} 0.2.5
         </Text>
         <View
           role="link"
