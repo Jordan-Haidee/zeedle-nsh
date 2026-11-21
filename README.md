@@ -13,6 +13,8 @@
   Built with <a href="https://nsh.dev">Native Shell</a>, Rust and Rodio
 </p>
 
+<p align="center"><a href="README.zh-CN.md">简体中文</a></p>
+
 ---
 
 Zeedle is a lightweight desktop music player focused on your local library. This project brings the original Zeedle experience to [Native Shell](https://nsh.dev), with a TSX interface and a Rust audio and metadata backend.
@@ -167,7 +169,7 @@ The original Zeedle project is maintained at [Jordan-Haidee/zeedle](https://gith
 
 ## Screenshots
 
-The following full-window captures show the Windows app in English. The library capture shows Shuffle selected. Search, lyrics and metadata editing are shown with “Love Story” by Taylor Swift.
+The following full-window captures show the Windows app in English with the dark theme enabled. The library capture shows Shuffle selected. Search, lyrics and metadata editing are shown with “Love Story” by Taylor Swift.
 
 ### Music library
 
