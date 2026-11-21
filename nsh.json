@@ -1,7 +1,7 @@
 {
   "name": "Zeedle",
   "id": "dev.zeedle.music-player",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "build": 2,
   "theme": "theme.json",
   "icon": "assets/cover.png",
