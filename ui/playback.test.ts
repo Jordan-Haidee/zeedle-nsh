@@ -14,6 +14,7 @@ const songs = ["a", "b", "c"].map((song_path, index) => ({
 test("ordered navigation follows playlist order and wraps at either end", () => {
   expect(selectNextSong(songs, "c", "order", [], -1)?.song_path).toBe("a");
   expect(selectPreviousSong(songs, "a", "order", [], -1)?.song_path).toBe("c");
+  expect(selectPreviousSong(songs, null, "order", [], -1)?.song_path).toBe("c");
   expect(selectNextSong(songs, null, "order", [], -1)?.song_path).toBe("a");
 });
 

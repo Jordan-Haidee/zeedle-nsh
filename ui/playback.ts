@@ -38,5 +38,6 @@ export function selectPreviousSong(
   }
 
   const index = songs.findIndex((song) => song.song_path === currentPath);
+  if (index < 0) return songs[songs.length - 1];
   return songs[(index - 1 + songs.length) % songs.length];
 }
