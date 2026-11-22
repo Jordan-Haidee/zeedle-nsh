@@ -169,7 +169,7 @@ The original Zeedle project is maintained at [Jordan-Haidee/zeedle](https://gith
 
 ## Screenshots
 
-The following full-window captures show the Windows app in English with the dark theme enabled. The library capture shows Shuffle selected. Search, lyrics and metadata editing are shown with “Love Story” by Taylor Swift.
+The following full-window captures show the Windows app in English with the dark theme and spectrum display enabled and the sidebar collapsed. Playback-related screens show “Love Story” by Taylor Swift playing with its progress visible.
 
 ### Music library
 

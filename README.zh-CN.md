@@ -169,7 +169,7 @@ powershell -File scripts/check-windows-startup.ps1
 
 ## 界面截图
 
-以下截图使用 Windows 暗色主题和中文界面。曲库、搜索、歌词与元数据编辑页面展示的是 Taylor Swift 的《Love Story》。
+以下截图使用 Windows 暗色主题，开启频谱显示并收起侧栏。播放相关页面展示“此生不换”正在播放及其进度。
 
 ### 音乐曲库
 
