@@ -97,6 +97,8 @@ export function App() {
   const spectrumBars = signal<number[]>(Array.from({ length: 48 }, () => 0));
   const playerError = signal("");
   const seeking = signal(false);
+  let pendingSeekPosition: number | null = null;
+  let pendingSeekUntil = 0;
   const trackWidth = signal(1);
   const history = signal<string[]>([]);
   const historyIndex = signal(-1);
@@ -319,6 +321,8 @@ export function App() {
 
   function seekTo(seconds: number) {
     const next = Math.max(0, Math.min(duration(), seconds));
+    pendingSeekPosition = next;
+    pendingSeekUntil = Date.now() + 1500;
     position.set(next);
     Music.seek(next);
   }
@@ -586,7 +590,15 @@ export function App() {
   setInterval(() => {
     const state = JSON.parse(Music.state()) as PlaybackState;
     if (!state.paused && state.duration > 0) {
-      if (!seeking()) position.set(state.position);
+      if (pendingSeekPosition !== null) {
+        if (
+          Date.now() >= pendingSeekUntil ||
+          Math.abs(state.position - pendingSeekPosition) <= 0.5
+        ) {
+          pendingSeekPosition = null;
+        }
+      }
+      if (!seeking() && pendingSeekPosition === null) position.set(state.position);
       duration.set(state.duration);
     }
     if (!pausePending()) paused.set(state.paused);
