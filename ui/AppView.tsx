@@ -783,7 +783,7 @@ export function App() {
                 ascending.set(true);
               }
             }}
-            class="w-[33%] flex-row items-center gap-1.25 hover:bg-hover"
+            class="w-[33%] h-full flex-row items-center gap-1.25 hover:bg-hover"
           >
             <Text style={{ ...textStyle(14, mutedColor()), marginLeft: "40%" }}>{t("Title")}</Text>
             {sortField() === "song_name" ? (
@@ -802,7 +802,7 @@ export function App() {
                 ascending.set(true);
               }
             }}
-            class="w-[33%] flex-row items-center gap-1.25 hover:bg-hover"
+            class="w-[33%] h-full flex-row items-center gap-1.25 hover:bg-hover"
           >
             <Text style={{ ...textStyle(14, mutedColor()), marginLeft: "40%" }}>{t("Artist")}</Text>
             {sortField() === "singer" ? (
@@ -821,7 +821,7 @@ export function App() {
                 ascending.set(true);
               }
             }}
-            class="w-[33%] flex-row items-center gap-1.25 hover:bg-hover"
+            class="w-[33%] h-full flex-row items-center gap-1.25 hover:bg-hover"
           >
             <Text style={{ ...textStyle(14, mutedColor()), marginLeft: "40%" }}>
               {t("Duration")}
