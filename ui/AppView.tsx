@@ -1264,7 +1264,6 @@ export function App() {
             <VolumeControl
               volume={volume}
               volumeLabel={t("Volume")}
-              muteLabel={t("Mute")}
               onVolumeChange={(next) => {
                 volume.set(next);
                 Music.setVolume(next);

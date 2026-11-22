@@ -48,7 +48,6 @@ export function PlayerTransportButton(props: TransportButtonProps) {
 type VolumeControlProps = {
   volume: Signal<number>;
   volumeLabel: string;
-  muteLabel: string;
   onVolumeChange: (value: number) => void;
 };
 
@@ -58,6 +57,7 @@ export function VolumeControl(props: VolumeControlProps) {
   const previewVolume = signal(props.volume());
   return (
     <View
+      testID="volume-control"
       class="relative h-17 w-full items-center justify-center"
       onMouseEnter={() => {
         previewVolume.set(props.volume());
@@ -88,18 +88,14 @@ export function VolumeControl(props: VolumeControlProps) {
             }
             dragging.set(false);
           }}
-          class="absolute right-3.25 top-1.5 h-13.75 w-5"
-          trackClass="h-13.75 w-5 justify-center bg-transparent"
+          class="absolute right-0.5 top-3.5 h-10 w-5"
+          trackClass="h-10 w-5 justify-center bg-transparent"
           indicatorClass="h-full w-1 rounded-full bg-track"
           rangeClass="w-1 rounded-full bg-primary"
           thumbClass="size-2.5 rounded-full border border-page bg-primary"
         />
       ) : null}
-      <View
-        accessibilityLabel={props.muteLabel}
-        onPress={() => props.onVolumeChange(props.volume() > 0 ? 0 : 0.8)}
-        class="flex h-7.5 w-7 items-center justify-center active:bg-pressed"
-      >
+      <View class="flex h-7.5 w-7 items-center justify-center">
         <LucideIcon
           name="volume2"
           size={20}

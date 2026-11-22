@@ -407,13 +407,6 @@ const translations: Record<string, Partial<Record<Language, string>>> = {
     ru: "Громкость",
     zh: "音量",
   },
-  Mute: {
-    es: "Silenciar",
-    fr: "Muet",
-    de: "Stumm",
-    ru: "Без звука",
-    zh: "静音",
-  },
   "Playback progress": {
     es: "Progreso de reproducción",
     fr: "Progression de lecture",

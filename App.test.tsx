@@ -411,7 +411,7 @@ test("dragging the volume slider changes playback volume when the drag ends", as
   });
 
   await app.waitFor("text:一眼万年");
-  await app.hover("label:Mute");
+  await app.hover("id:volume-control");
   await app.waitFor("label:Volume");
   await app.wait(150);
   const before = (JSON.parse(Music.state()) as { volume: number }).volume;
