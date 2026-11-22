@@ -24,7 +24,7 @@ import { currentWindow, Menu, Tray, titleBar } from "nsh/desktop";
 import { AppConfig, Music } from "zeedle-nsh/native";
 import { LucideIcon, type LucideName } from "./icons";
 import cover from "../assets/cover.svg";
-import { translate, type Language } from "./translations";
+import { languageName, parseLanguage, translate, type Language } from "./translations";
 import { createTrayOptions } from "./tray";
 import type {
   AppConfigValue,
@@ -61,7 +61,7 @@ export function App() {
   const expanded = signal(config.sidebar_expanded);
   const light = () => colorScheme() === "light";
   const followSystem = signal(config.follow_system_theme);
-  const language = signal<Language>((config.lang || "en") as Language);
+  const language = signal<Language>(parseLanguage(config.lang));
   const directory = signal(config.song_dir || Music.defaultDirectory());
   const songs = signal<SongInfo[]>([]);
   const current = signal<SongInfo | null>(null);
@@ -124,7 +124,7 @@ export function App() {
   let lastLyricsScrollOffset: number | null = null;
   let handledEnd = false;
 
-  const t = (english: string, chinese: string) => translate(language(), english, chinese);
+  const t = (key: string) => translate(language(), key);
   async function openExternalUrl(url: string) {
     const error = await Music.openUrl(url);
     if (error) playerError.set(error);
@@ -430,15 +430,9 @@ export function App() {
         editArtist.set(metadata.artist || song.singer);
         editAlbum.set(metadata.album || "");
         editCoverPreview.set(metadata.cover || cover);
-        editCoverName.set(
-          metadata.cover ? t("Embedded artwork", "内嵌封面") : t("No cover image", "没有封面图片"),
-        );
+        editCoverName.set(metadata.cover ? t("Embedded artwork") : t("No cover image"));
         editLyricsPreview.set(metadata.lyrics || "");
-        editLyricsName.set(
-          metadata.lyrics
-            ? t("Embedded lyrics", "内嵌歌词")
-            : t("No embedded lyrics", "没有内嵌歌词"),
-        );
+        editLyricsName.set(metadata.lyrics ? t("Embedded lyrics") : t("No embedded lyrics"));
       }
     } catch (error) {
       editError.set(String(error));
@@ -450,7 +444,7 @@ export function App() {
     if (!path) return;
     const preview = await Music.coverFile(path);
     if (!preview) {
-      editError.set(t("Could not read that image file.", "无法读取该图片文件。"));
+      editError.set(t("Could not read that image file."));
       return;
     }
     editCoverPath.set(path);
@@ -464,7 +458,7 @@ export function App() {
     if (!path) return;
     const text = await Music.lyricsFile(path);
     if (!text) {
-      editError.set(t("Could not read that LRC file.", "无法读取该 LRC 文件。"));
+      editError.set(t("Could not read that LRC file."));
       return;
     }
     editLyricsPath.set(path);
@@ -477,7 +471,7 @@ export function App() {
     const song = editingSong();
     if (!song || editSaving()) return;
     if (!editTitle().trim() || !editArtist().trim()) {
-      editError.set(t("Title and artist are required.", "歌曲名和艺术家必填。"));
+      editError.set(t("Title and artist are required."));
       return;
     }
     editSaving.set(true);
@@ -698,15 +692,10 @@ export function App() {
           <View class="flex-1 min-h-55 items-center justify-center gap-2">
             <LucideIcon name="search" size={24} color={mutedColor()} />
             <Text style={textStyle(13, mutedColor())}>
-              {loading()
-                ? t("Reading your music library…", "正在读取音乐库…")
-                : t("No songs found in this folder", "此文件夹中没有歌曲")}
+              {loading() ? t("Reading your music library…") : t("No songs found in this folder")}
             </Text>
             <Text style={textStyle(12, mutedColor())}>
-              {t(
-                "Choose a folder with MP3, FLAC, WAV or OGG files",
-                "选择包含 MP3、FLAC、WAV 或 OGG 文件的文件夹",
-              )}
+              {t("Choose a folder with MP3, FLAC, WAV or OGG files")}
             </Text>
           </View>
         }
@@ -717,11 +706,11 @@ export function App() {
             const selected = item();
             void Menu.popup([
               {
-                label: t("Edit metadata…", "编辑元数据…"),
+                label: t("Edit metadata…"),
                 onSelect: () => void beginEdit(selected),
               },
               { type: "separator" },
-              { label: t("Delete song…", "删除歌曲…"), onSelect: () => deleteTarget.set(selected) },
+              { label: t("Delete song…"), onSelect: () => deleteTarget.set(selected) },
             ]);
           };
           return (
@@ -796,9 +785,7 @@ export function App() {
             }}
             class="w-[33%] flex-row items-center gap-1.25 hover:bg-hover"
           >
-            <Text style={{ ...textStyle(14, mutedColor()), marginLeft: "40%" }}>
-              {t("Title", "标题")}
-            </Text>
+            <Text style={{ ...textStyle(14, mutedColor()), marginLeft: "40%" }}>{t("Title")}</Text>
             {sortField() === "song_name" ? (
               <LucideIcon
                 name={ascending() ? "arrowUp" : "arrowDown"}
@@ -817,9 +804,7 @@ export function App() {
             }}
             class="w-[33%] flex-row items-center gap-1.25 hover:bg-hover"
           >
-            <Text style={{ ...textStyle(14, mutedColor()), marginLeft: "40%" }}>
-              {t("Artist", "艺术家")}
-            </Text>
+            <Text style={{ ...textStyle(14, mutedColor()), marginLeft: "40%" }}>{t("Artist")}</Text>
             {sortField() === "singer" ? (
               <LucideIcon
                 name={ascending() ? "arrowUp" : "arrowDown"}
@@ -839,7 +824,7 @@ export function App() {
             class="w-[33%] flex-row items-center gap-1.25 hover:bg-hover"
           >
             <Text style={{ ...textStyle(14, mutedColor()), marginLeft: "40%" }}>
-              {t("Duration", "时长")}
+              {t("Duration")}
             </Text>
             {sortField() === "duration_secs" ? (
               <LucideIcon
@@ -874,7 +859,7 @@ export function App() {
               ref={searchInputRef}
               testID="song-search"
               value={query()}
-              placeholder={t("Search songs or artists...", "搜索歌曲或艺术家…")}
+              placeholder={t("Search songs or artists...")}
               onChange={({ value }) => updateSearch(value)}
               class="h-6 flex-1 bg-transparent px-1 text-[13px]"
               style={{ color: textColor(), fontFamily: appFontFamily }}
@@ -889,9 +874,7 @@ export function App() {
         {search() ? (
           <View class="h-6.5 justify-center px-3">
             <Text style={textStyle(12, mutedColor())}>
-              {language() === "zh"
-                ? `${searchResults().length} ${t("result(s) found", "个结果")}`
-                : `${searchResults().length} ${t("result(s) found", "result(s) found")}`}
+              {t("{count} results found").replace("{count}", String(searchResults().length))}
             </Text>
           </View>
         ) : null}
@@ -900,9 +883,7 @@ export function App() {
         ) : (
           <View class="flex-1 items-center justify-center gap-2">
             <LucideIcon name="search" size={44} color={mutedColor()} />
-            <Text style={textStyle(14, mutedColor())}>
-              {t("Type to search your music", "输入关键词开始搜索")}
-            </Text>
+            <Text style={textStyle(14, mutedColor())}>{t("Type to search your music")}</Text>
           </View>
         )}
       </View>
@@ -945,7 +926,7 @@ export function App() {
               }}
             >
               <Text numberOfLines={1} style={textStyle(14, textColor())}>
-                {`${t("Artist:", "艺术家：")}${language() === "zh" ? "" : " "}${current()?.singer ?? t("Unknown", "未知")}`}
+                {`${t("Artist:")} ${current()?.singer ?? t("Unknown")}`}
               </Text>
             </View>
             <View
@@ -957,7 +938,7 @@ export function App() {
               }}
             >
               <Text numberOfLines={1} style={textStyle(14, textColor())}>
-                {`${t("Title:", "歌曲：")}${language() === "zh" ? "" : " "}${current()?.song_name ?? t("No song", "无歌曲")}`}
+                {`${t("Title:")} ${current()?.song_name ?? t("No song")}`}
               </Text>
             </View>
           </View>
@@ -1037,12 +1018,10 @@ export function App() {
       <View testID="screen-3" class="flex-1 min-h-0">
         <Scroll testID="settings-scroll" class="flex-1" contentClass="p-6 gap-5">
           <View class={cardClass}>
-            <Text style={textStyle(12, mutedColor(), "600")}>{t("Playback", "播放")}</Text>
+            <Text style={textStyle(12, mutedColor(), "600")}>{t("Playback")}</Text>
             <View class="h-px bg-divider" />
             <View class="gap-1.5">
-              <Text style={textStyle(13, secondaryColor())}>
-                {t("Music directory", "音乐文件夹")}
-              </Text>
+              <Text style={textStyle(13, secondaryColor())}>{t("Music directory")}</Text>
               <View class="flex-row items-center gap-2">
                 <View class="h-8 min-w-0 flex-1 justify-center rounded border border-input-border bg-raised px-3">
                   <Text numberOfLines={1} style={textStyle(13, secondaryColor())}>
@@ -1053,40 +1032,36 @@ export function App() {
                   onPress={() => void chooseDirectory()}
                   class="h-8 flex-row items-center justify-center rounded bg-button px-3"
                 >
-                  <Text style={textStyle(14, textColor(), "500")}>{t("Browse…", "浏览…")}</Text>
+                  <Text style={textStyle(14, textColor(), "500")}>{t("Browse…")}</Text>
                 </View>
               </View>
             </View>
             <View class="flex-row items-center gap-2.5">
-              {checkbox(showSpectrum(), t("Spectrum display", "频谱显示"), changeSpectrum)}
+              {checkbox(showSpectrum(), t("Spectrum display"), changeSpectrum)}
               <Text onPress={changeSpectrum} style={textStyle(14, textColor())}>
-                {t("Spectrum display", "频谱显示")}
+                {t("Spectrum display")}
               </Text>
             </View>
           </View>
           <View class={cardClass}>
-            <Text style={textStyle(12, mutedColor(), "600")}>{t("Appearance", "外观")}</Text>
+            <Text style={textStyle(12, mutedColor(), "600")}>{t("Appearance")}</Text>
             <View class="h-px bg-divider" />
             <View class="flex-row items-center gap-2.5">
-              {checkbox(
-                followSystem(),
-                t("Follow system theme", "跟随系统主题"),
-                changeFollowSystem,
-              )}
+              {checkbox(followSystem(), t("Follow system theme"), changeFollowSystem)}
               <Text onPress={changeFollowSystem} style={textStyle(14, textColor())}>
-                {t("Follow system theme", "跟随系统主题")}
+                {t("Follow system theme")}
               </Text>
             </View>
             <View class="gap-1.5">
-              <Text style={textStyle(13, secondaryColor())}>{t("Language", "语言")}</Text>
+              <Text style={textStyle(13, secondaryColor())}>{t("Language")}</Text>
               <View class="flex-row gap-2">
                 {[
-                  { code: "en", label: "English" },
-                  { code: "zh", label: "中文" },
-                  { code: "es", label: "Español" },
-                  { code: "fr", label: "Français" },
-                  { code: "de", label: "Deutsch" },
-                  { code: "ru", label: "Русский" },
+                  { code: "en", label: languageName("en") },
+                  { code: "zh", label: languageName("zh") },
+                  { code: "es", label: languageName("es") },
+                  { code: "fr", label: languageName("fr") },
+                  { code: "de", label: languageName("de") },
+                  { code: "ru", label: languageName("ru") },
                 ].map((option) => {
                   return (
                     <View
@@ -1126,12 +1101,12 @@ export function App() {
       <View testID="screen-4" class="flex-1 items-center justify-center gap-2.5">
         <Image src={cover} style={{ width: 120, height: 120 }} />
         <Text numberOfLines={2} style={{ ...textStyle(14, textColor()), textAlign: "center" }}>
-          {`Zeedle\n${t("Music at the speed of a blink, designed for pure simplicity", "以眨眼般的速度享受音乐，追求纯粹简洁")}`}
+          {`Zeedle\n${t("Music at the speed of a blink, designed for pure simplicity")}`}
         </Text>
         <View
           style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }}
         >
-          <Text style={textStyle(14, textColor())}>{t("Built by", "构建者")}</Text>
+          <Text style={textStyle(14, textColor())}>{t("Built by")}</Text>
           <View
             role="link"
             accessibilityLabel="Rodio"
@@ -1141,7 +1116,7 @@ export function App() {
               Rodio
             </Text>
           </View>
-          <Text style={textStyle(14, textColor())}>{t("and", "和")}</Text>
+          <Text style={textStyle(14, textColor())}>{t("and")}</Text>
           <View
             testID="about-nsh-link"
             role="link"
@@ -1154,8 +1129,8 @@ export function App() {
           </View>
         </View>
         <Text numberOfLines={2} style={{ ...textStyle(14, textColor()), textAlign: "center" }}>
-          {t("Author:", "作者：")} Jordan Haidee{"\n"}
-          {t("Version:", "版本：")} 0.2.5
+          {t("Author:")} Jordan Haidee{"\n"}
+          {t("Version:")} 0.2.5
         </Text>
         <View
           role="link"
@@ -1183,7 +1158,7 @@ export function App() {
           <ProgressSlider
             position={position}
             duration={duration}
-            label={t("Playback progress", "播放进度")}
+            label={t("Playback progress")}
             onChange={(next) => {
               seeking.set(true);
               position.set(next);
@@ -1208,14 +1183,14 @@ export function App() {
               >
                 {current()
                   ? `${current()!.song_name} - ${current()!.singer}`
-                  : t("No song selected", "尚未选择歌曲")}
+                  : t("No song selected")}
               </Text>
             </View>
           </View>
           <View class="w-[6%] flex-row items-center justify-center">
             <View
               testID="control-repeat"
-              accessibilityLabel={t("Repeat current track", "单曲循环")}
+              accessibilityLabel={t("Repeat current track")}
               accessibilityState={{ selected: mode() !== "random" }}
               onPress={() => changeMode(mode() === "order" ? "repeat" : "order")}
               class="items-center justify-center"
@@ -1231,7 +1206,7 @@ export function App() {
           <View class="w-[6%] flex-row items-center justify-center">
             <PlayerTransportButton
               testID="control-previous"
-              label={t("Previous track", "上一首")}
+              label={t("Previous track")}
               name="skipBack"
               color={secondaryColor()}
               onPress={playPrevious}
@@ -1241,7 +1216,7 @@ export function App() {
           <View class="w-[6%] flex-row items-center justify-center">
             <PlayerTransportButton
               testID="control-play-pause"
-              label={paused() ? t("Play", "播放") : t("Pause", "暂停")}
+              label={paused() ? t("Play") : t("Pause")}
               name={paused() ? "play" : "pause"}
               color={accentColor()}
               onPress={togglePlay}
@@ -1250,7 +1225,7 @@ export function App() {
           <View class="w-[6%] flex-row items-center justify-center">
             <PlayerTransportButton
               testID="control-next"
-              label={t("Next track", "下一首")}
+              label={t("Next track")}
               name="skipForward"
               color={secondaryColor()}
               onPress={playNext}
@@ -1267,7 +1242,7 @@ export function App() {
           >
             <View
               testID="control-shuffle"
-              accessibilityLabel={t("Shuffle", "随机播放")}
+              accessibilityLabel={t("Shuffle")}
               accessibilityState={{ selected: mode() === "random" }}
               onPress={() => changeMode("random")}
               class="items-center justify-center"
@@ -1288,8 +1263,8 @@ export function App() {
           <View class="w-[10%] items-center justify-center">
             <VolumeControl
               volume={volume}
-              volumeLabel={t("Volume", "音量")}
-              muteLabel={t("Mute", "静音")}
+              volumeLabel={t("Volume")}
+              muteLabel={t("Mute")}
               onVolumeChange={(next) => {
                 volume.set(next);
                 Music.setVolume(next);
@@ -1319,7 +1294,7 @@ export function App() {
         <View class="flex-1" />
         <View
           testID="theme-toggle"
-          accessibilityLabel={t("Toggle theme", "切换主题")}
+          accessibilityLabel={t("Toggle theme")}
           disabled={followSystem()}
           disabledStyle={{ opacity: 0.4 }}
           class="h-10 w-10.5 items-center justify-center hover:bg-hover"
@@ -1350,7 +1325,7 @@ export function App() {
             </View>
             <View
               testID="window-close"
-              accessibilityLabel={t("Hide window", "隐藏窗口")}
+              accessibilityLabel={t("Hide window")}
               onPress={() => win.hide()}
               class="h-10 w-10.5 items-center justify-center"
               hoverStyle={{ backgroundColor: "#e81123" }}
@@ -1386,19 +1361,19 @@ export function App() {
             </View>
           </View>
           <View class="h-1.25" />
-          <SideButton icon="listMusic" label={t("Gallery", "曲库")} target={0} />
-          <SideButton icon="search" label={t("Search", "搜索")} target={1} />
-          <SideButton icon="captions" label={t("Lyrics", "歌词")} target={2} />
+          <SideButton icon="listMusic" label={t("Gallery")} target={0} />
+          <SideButton icon="search" label={t("Search")} target={1} />
+          <SideButton icon="captions" label={t("Lyrics")} target={2} />
           <View class="flex-1" />
           <View class="mx-px mb-2 h-px bg-border" />
-          <SideButton icon="settings" label={t("Settings", "设置")} target={3} />
-          <SideButton icon="circleHelp" label={t("About", "关于")} target={4} />
+          <SideButton icon="settings" label={t("Settings")} target={3} />
+          <SideButton icon="circleHelp" label={t("About")} target={4} />
         </View>
 
         <View
           ref={contentPaneRef}
           focusable
-          accessibilityLabel={t("Main content", "主内容")}
+          accessibilityLabel={t("Main content")}
           class="relative flex-1 min-h-0 min-w-0 flex-col bg-panel"
         >
           <View class="flex-1 min-h-0 overflow-hidden bg-page" style={contentCornerStyle}>
@@ -1457,11 +1432,9 @@ export function App() {
       {editingSong() ? (
         <View class="absolute inset-0 z-20 items-center justify-center p-2.5">
           <View class="h-112.5 w-130 max-h-[96%] max-w-[96%] gap-[7.5px] rounded-lg border border-border bg-page px-4 pt-3.5 pb-4">
-            <Text style={textStyle(18, textColor(), "600")}>
-              {t("Edit song metadata", "编辑歌曲元信息")}
-            </Text>
+            <Text style={textStyle(18, textColor(), "600")}>{t("Edit song metadata")}</Text>
             <View style={{ gap: 4 }}>
-              <Text style={textStyle(14, secondaryColor())}>{t("Song title", "歌曲名")}</Text>
+              <Text style={textStyle(14, secondaryColor())}>{t("Song title")}</Text>
               <Input
                 testID="edit-title"
                 value={editTitle()}
@@ -1471,7 +1444,7 @@ export function App() {
             </View>
             <View style={{ flexDirection: "row", gap: 12 }}>
               <View style={{ flex: 1, gap: 4 }}>
-                <Text style={textStyle(14, secondaryColor())}>{t("Artist", "艺术家")}</Text>
+                <Text style={textStyle(14, secondaryColor())}>{t("Artist")}</Text>
                 <Input
                   testID="edit-artist"
                   value={editArtist()}
@@ -1480,7 +1453,7 @@ export function App() {
                 />
               </View>
               <View style={{ flex: 1, gap: 4 }}>
-                <Text style={textStyle(14, secondaryColor())}>{t("Album", "专辑")}</Text>
+                <Text style={textStyle(14, secondaryColor())}>{t("Album")}</Text>
                 <Input
                   testID="edit-album"
                   value={editAlbum()}
@@ -1493,9 +1466,7 @@ export function App() {
               style={{ height: 200, minHeight: 200, marginTop: -1, flexDirection: "row", gap: 10 }}
             >
               <View class="min-w-0 flex-1 gap-1.5 rounded-lg border border-border bg-panel pt-2 pb-2.5 pl-2 pr-2.5">
-                <Text style={textStyle(14, textColor(), "600")}>
-                  {t("Album cover", "专辑封面")}
-                </Text>
+                <Text style={textStyle(14, textColor(), "600")}>{t("Album cover")}</Text>
                 <View class="-mt-px min-h-0 flex-row items-start">
                   <Image src={editCoverPreview()} class="size-25" />
                 </View>
@@ -1503,42 +1474,32 @@ export function App() {
                   onPress={() => void chooseEditCover()}
                   class="h-8 items-center justify-center rounded bg-raised"
                 >
-                  <Text style={textStyle(13, textColor())}>
-                    {t("Select cover image", "选择封面图片")}
-                  </Text>
+                  <Text style={textStyle(13, textColor())}>{t("Select cover image")}</Text>
                 </View>
                 <Text style={textStyle(11, mutedColor())}>
-                  {editCoverPath()
-                    ? editCoverName()
-                    : t("Existing cover will be kept", "将保留现有封面")}
+                  {editCoverPath() ? editCoverName() : t("Existing cover will be kept")}
                 </Text>
               </View>
               <View class="min-w-0 flex-1 gap-1.5 rounded-lg border border-border bg-panel px-2.5 pt-2 pb-2.5">
-                <Text style={textStyle(14, textColor(), "600")}>{t("Lyrics", "歌词")}</Text>
+                <Text style={textStyle(14, textColor(), "600")}>{t("Lyrics")}</Text>
                 <Scroll class="-mt-px h-25 min-h-25 rounded bg-raised p-2">
-                  {(editLyricsPreview() || t("No embedded lyrics", "没有内嵌歌词"))
-                    .split(/\r?\n/)
-                    .map((line) => (
-                      <Text
-                        numberOfLines={1}
-                        style={{ ...textStyle(11, textColor()), lineHeight: 13 }}
-                      >
-                        {line}
-                      </Text>
-                    ))}
+                  {(editLyricsPreview() || t("No embedded lyrics")).split(/\r?\n/).map((line) => (
+                    <Text
+                      numberOfLines={1}
+                      style={{ ...textStyle(11, textColor()), lineHeight: 13 }}
+                    >
+                      {line}
+                    </Text>
+                  ))}
                 </Scroll>
                 <View
                   onPress={() => void chooseEditLyrics()}
                   class="h-8 items-center justify-center rounded bg-raised"
                 >
-                  <Text style={textStyle(13, textColor())}>
-                    {t("Select LRC file", "选择 LRC 歌词文件")}
-                  </Text>
+                  <Text style={textStyle(13, textColor())}>{t("Select LRC file")}</Text>
                 </View>
                 <Text style={textStyle(11, mutedColor())}>
-                  {editLyricsPath()
-                    ? editLyricsName()
-                    : t("Existing lyrics will be kept", "将保留现有歌词")}
+                  {editLyricsPath() ? editLyricsName() : t("Existing lyrics will be kept")}
                 </Text>
               </View>
             </View>
@@ -1551,7 +1512,7 @@ export function App() {
                 onPress={() => editingSong.set(null)}
                 class="h-8 w-17 items-center justify-center rounded bg-raised"
               >
-                <Text style={textStyle(13, textColor())}>{t("Cancel", "取消")}</Text>
+                <Text style={textStyle(13, textColor())}>{t("Cancel")}</Text>
               </View>
               <View
                 onPress={() => void saveEdit()}
@@ -1559,7 +1520,7 @@ export function App() {
                 style={{ opacity: editSaving() ? 0.65 : 1 }}
               >
                 <Text style={textStyle(13, textColor(), "500")}>
-                  {editSaving() ? t("Saving…", "正在保存…") : t("Save", "保存")}
+                  {editSaving() ? t("Saving…") : t("Save")}
                 </Text>
               </View>
             </View>
@@ -1570,12 +1531,10 @@ export function App() {
       {deleteTarget() ? (
         <View class="absolute inset-0 z-21 items-center justify-center p-5">
           <View class="w-92.5 max-w-full gap-2.75 rounded-lg border border-border bg-page p-5">
-            <Text style={textStyle(17, textColor(), "600")}>
-              {t("Delete this song?", "删除这首歌曲？")}
-            </Text>
+            <Text style={textStyle(17, textColor(), "600")}>{t("Delete this song?")}</Text>
             <Text style={textStyle(13, textColor(), "500")}>{deleteTarget()?.song_name}</Text>
             <Text numberOfLines={2} style={textStyle(11, secondaryColor())}>
-              {t("The audio file will be removed from your device.", "此音频文件将从设备中删除。")}
+              {t("The audio file will be removed from your device.")}
             </Text>
             <View
               style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 5 }}
@@ -1585,11 +1544,11 @@ export function App() {
                 onPress={() => deleteTarget.set(null)}
                 class="rounded bg-raised px-3.25 py-2"
               >
-                <Text style={textStyle(12, secondaryColor(), "500")}>{t("Cancel", "取消")}</Text>
+                <Text style={textStyle(12, secondaryColor(), "500")}>{t("Cancel")}</Text>
               </View>
               <View onPress={() => void confirmDelete()} class="rounded bg-danger px-3.5 py-2">
                 <Text style={textStyle(12, token("destructive-foreground"), "600")}>
-                  {t("Delete song", "删除歌曲")}
+                  {t("Delete song")}
                 </Text>
               </View>
             </View>

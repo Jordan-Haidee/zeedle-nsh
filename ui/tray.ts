@@ -3,7 +3,7 @@ import type { TrayOptions, WindowRef } from "nsh/desktop";
 export function createTrayOptions(
   window: Pick<WindowRef, "show" | "focus">,
   rescanSongs: () => void,
-  translate: (english: string, chinese: string) => string,
+  translate: (key: string) => string,
 ): TrayOptions {
   const showWindow = () => {
     window.show();
@@ -14,13 +14,13 @@ export function createTrayOptions(
     tooltip: "Zeedle",
     onClick: showWindow,
     menu: [
-      { label: translate("Show window", "显示窗口"), onSelect: showWindow },
+      { label: translate("Show window"), onSelect: showWindow },
       {
-        label: translate("Rescan songs", "重新扫描歌曲"),
+        label: translate("Rescan songs"),
         onSelect: rescanSongs,
       },
       { type: "separator" },
-      { label: translate("Exit", "退出"), role: "quit" },
+      { label: translate("Exit"), role: "quit" },
     ],
   };
 }
