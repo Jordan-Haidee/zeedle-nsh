@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{path::Path, time::Instant};
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use nsh_core::prelude::*;
@@ -10,6 +10,23 @@ mod spectrum;
 
 mod audio;
 mod library;
+
+fn first_screen_ready_message(elapsed_ms: u64) -> String {
+    format!("first screen appeared in {elapsed_ms} ms")
+}
+
+#[cfg(test)]
+mod timing_tests {
+    use super::first_screen_ready_message;
+
+    #[test]
+    fn first_screen_timing_log_includes_elapsed_milliseconds() {
+        assert_eq!(
+            first_screen_ready_message(123),
+            "first screen appeared in 123 ms"
+        );
+    }
+}
 
 #[native_module("zeedle-nsh/native")]
 fn native(registry: &mut Registry) {
@@ -140,8 +157,14 @@ impl Music {
     }
     /// Scan one directory for supported music files and read their Lofty tags.
     pub async fn scan(directory: String) -> String {
+        let started_at = Instant::now();
         log::info!("scanning music directory: {directory}");
         let songs = library::scan(Path::new(&directory));
+        log::info!(
+            "music directory scan completed in {} ms: {} songs in {directory}",
+            started_at.elapsed().as_millis(),
+            songs.len()
+        );
         if songs.is_empty() {
             log::warn!("no supported songs found in {directory}");
         } else {
@@ -151,6 +174,11 @@ impl Music {
             log::error!("failed to serialize scanned songs: {error}");
             "[]".into()
         })
+    }
+
+    /// Record how long it took the initial window to become visible.
+    pub fn log_first_screen_ready(elapsed_ms: u64) {
+        log::info!("{}", first_screen_ready_message(elapsed_ms));
     }
 
     /// Read embedded lyrics from an audio file and parse LRC timestamps.

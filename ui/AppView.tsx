@@ -46,6 +46,7 @@ const contentCornerStyle = {
 };
 
 export function App() {
+  const startupStartedAt = Date.now();
   const config = JSON.parse(AppConfig.load()) as AppConfigValue;
   const appFontFamily = AppConfig.defaultFontFamily();
   const win = currentWindow();
@@ -528,6 +529,7 @@ export function App() {
     .catch((error) => playerError.set(String(error)))
     .finally(() => {
       win.show();
+      Music.logFirstScreenReady(Math.max(0, Date.now() - startupStartedAt));
     });
 
   function saveConfig() {
