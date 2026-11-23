@@ -144,7 +144,7 @@ nsh package App.tsx --target windows
 
 Each GitHub Release includes one Windows installer, one Linux package and one macOS app bundle, named `Zeedle-<tag>-windows-x86_64-setup.exe`, `Zeedle-<tag>-linux-x86_64.tar.gz` and `Zeedle-<tag>-macos-aarch64.app.zip`. CI also uploads the unarchived `.app` bundle. Linux requires GTK 4.14 and WebKitGTK 6.0; macOS requires version 14 or newer. The macOS package is an ad hoc signed `.app` bundle.
 
-Push a tag matching the version in `nsh.json` (for example, `v0.2.6`) to build all three platform packages and publish a GitHub Release. The Actions workflow can also be started manually to validate packaging and screenshots without publishing.
+Push a tag matching the version in `nsh.json` (for example, `v0.2.7`) to build all three platform packages and publish a GitHub Release. The Actions workflow can also be started manually to validate packaging and screenshots without publishing.
 
 For Windows rendering and startup checks:
 

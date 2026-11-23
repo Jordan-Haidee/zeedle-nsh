@@ -1943,7 +1943,7 @@ dependencies = [
 
 [[package]]
 name = "nsh-app-zeedle-nsh"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "base64 0.22.1",
  "chrono",

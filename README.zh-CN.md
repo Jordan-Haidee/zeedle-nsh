@@ -144,7 +144,7 @@ nsh package App.tsx --target windows
 
 每个 GitHub Release 包含一个 Windows 安装程序、一个 Linux 软件包和一个 macOS 应用压缩包，文件名分别为 `Zeedle-<tag>-windows-x86_64-setup.exe`、`Zeedle-<tag>-linux-x86_64.tar.gz` 和 `Zeedle-<tag>-macos-aarch64.app.zip`。CI 也会上传未压缩的 `.app` bundle。Linux 需要 GTK 4.14 和 WebKitGTK 6.0；macOS 需要 14 或更新版本。macOS 软件包使用 ad hoc 签名。
 
-推送与 `nsh.json` 中版本号匹配的 tag（例如 `v0.2.6`），即可构建三个平台的软件包并发布 GitHub Release。也可以手动启动 Actions workflow 来验证打包和截图，而不发布版本。
+推送与 `nsh.json` 中版本号匹配的 tag（例如 `v0.2.7`），即可构建三个平台的软件包并发布 GitHub Release。也可以手动启动 Actions workflow 来验证打包和截图，而不发布版本。
 
 Windows 渲染和启动检查：
 
