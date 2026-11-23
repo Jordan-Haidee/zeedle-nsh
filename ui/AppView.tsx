@@ -20,7 +20,7 @@ import { Checkbox as NshCheckbox, Input } from "nsh/base";
 import { ProgressSlider } from "./components/ProgressSlider";
 import { PlayerTransportButton, VolumeControl } from "./components/PlayerControls";
 import { Text } from "./components/Text";
-import { currentWindow, Menu, Tray, titleBar } from "nsh/desktop";
+import { Application, currentWindow, Menu, Tray, titleBar } from "nsh/desktop";
 import { AppConfig, Music } from "zeedle-nsh/native";
 import { LucideIcon, type LucideName } from "./icons";
 import cover from "../assets/cover.svg";
@@ -37,6 +37,7 @@ import type {
 } from "./types";
 import { sameSongPath, timeLabel } from "./format";
 import { selectNextSong, selectPreviousSong } from "./playback";
+import { closeWindow } from "./window";
 
 const contentCornerStyle = {
   borderRadius: 10,
@@ -57,9 +58,9 @@ export function App() {
     maxSize: null,
     closeOnPress: false,
   });
-  win.on("closePress", () => win.hide());
   const page = signal<Page>(Math.max(0, Math.min(4, config.current_page)) as Page);
   const expanded = signal(config.sidebar_expanded);
+  const closeToTray = signal(config.close_to_tray);
   const light = () => colorScheme() === "light";
   const followSystem = signal(config.follow_system_theme);
   const language = signal<Language>(parseLanguage(config.lang));
@@ -126,6 +127,15 @@ export function App() {
   let handledEnd = false;
 
   const t = (key: string) => translate(language(), key);
+  function handleWindowClose() {
+    saveConfig();
+    closeWindow(
+      closeToTray(),
+      () => win.hide(),
+      () => Application.quit(),
+    );
+  }
+  win.on("closePress", handleWindowClose);
   async function openExternalUrl(url: string) {
     const error = await Music.openUrl(url);
     if (error) playerError.set(error);
@@ -554,6 +564,7 @@ export function App() {
       current_page: page(),
       sidebar_expanded: expanded(),
       gallery_viewport_y: galleryViewportY(),
+      close_to_tray: closeToTray(),
     };
     const error = AppConfig.save(JSON.stringify(snapshot));
     if (error) console.error(`failed to save config: ${error}`);
@@ -574,6 +585,7 @@ export function App() {
     volume();
     showSpectrum();
     galleryViewportY();
+    closeToTray();
     if (firstConfigEffectRun) {
       firstConfigEffectRun = false;
       return;
@@ -1046,6 +1058,21 @@ export function App() {
             </View>
           </View>
           <View class={cardClass}>
+            <Text style={textStyle(12, mutedColor(), "600")}>{t("Window")}</Text>
+            <View class="h-px bg-divider" />
+            <View class="flex-row items-center gap-2.5">
+              {checkbox(closeToTray(), t("Keep in system tray when closing"), () =>
+                closeToTray.set(!closeToTray()),
+              )}
+              <Text
+                onPress={() => closeToTray.set(!closeToTray())}
+                style={textStyle(14, textColor())}
+              >
+                {t("Keep in system tray when closing")}
+              </Text>
+            </View>
+          </View>
+          <View class={cardClass}>
             <Text style={textStyle(12, mutedColor(), "600")}>{t("Appearance")}</Text>
             <View class="h-px bg-divider" />
             <View class="flex-row items-center gap-2.5">
@@ -1327,7 +1354,7 @@ export function App() {
             <View
               testID="window-close"
               accessibilityLabel={t("Hide window")}
-              onPress={() => win.hide()}
+              onPress={handleWindowClose}
               class="h-10 w-10.5 items-center justify-center"
               hoverStyle={{ backgroundColor: "#e81123" }}
             >

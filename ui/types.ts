@@ -35,4 +35,5 @@ export type AppConfigValue = {
   current_page: number;
   sidebar_expanded: boolean;
   gallery_viewport_y: number;
+  close_to_tray: boolean;
 };

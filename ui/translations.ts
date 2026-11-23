@@ -136,6 +136,20 @@ const translations: Record<string, Partial<Record<Language, string>>> = {
     ru: "Воспроизведение",
     zh: "播放",
   },
+  Window: {
+    es: "Ventana",
+    fr: "Fenêtre",
+    de: "Fenster",
+    ru: "Окно",
+    zh: "窗口",
+  },
+  "Keep in system tray when closing": {
+    es: "Mantener en la bandeja del sistema al cerrar",
+    fr: "Garder dans la zone de notification à la fermeture",
+    de: "Beim Schließen im Infobereich behalten",
+    ru: "Оставлять в системном трее при закрытии",
+    zh: "关闭窗口时保留在系统托盘",
+  },
   "Music directory": {
     es: "Carpeta de música",
     fr: "Dossier musical",

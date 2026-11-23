@@ -39,6 +39,8 @@ pub struct Config {
     pub sidebar_expanded: bool,
     #[serde(default)]
     pub gallery_viewport_y: f32,
+    #[serde(default)]
+    pub close_to_tray: bool,
 }
 
 impl Default for Config {
@@ -58,6 +60,7 @@ impl Default for Config {
             current_page: 0,
             sidebar_expanded: false,
             gallery_viewport_y: 0.0,
+            close_to_tray: false,
         }
     }
 }
@@ -163,6 +166,7 @@ mod tests {
         assert_eq!(config.current_page, 0);
         assert!(!config.sidebar_expanded);
         assert_eq!(config.gallery_viewport_y, 0.0);
+        assert!(!config.close_to_tray);
     }
 
     #[test]
@@ -172,6 +176,15 @@ mod tests {
         assert!(text.contains("play_mode = \"InOrder\""));
         assert!(text.contains("sort_key = \"BySongName\""));
         assert_eq!(Config::from_toml(&text).unwrap(), config);
+
+        let tray_config = Config {
+            close_to_tray: true,
+            ..config
+        };
+        assert_eq!(
+            Config::from_toml(&tray_config.to_toml().unwrap()).unwrap(),
+            tray_config
+        );
     }
 
     #[test]
@@ -203,6 +216,7 @@ volume = 1.0
         assert_eq!(config.current_page, 0);
         assert!(!config.sidebar_expanded);
         assert_eq!(config.gallery_viewport_y, 0.0);
+        assert!(!config.close_to_tray);
     }
 
     #[test]

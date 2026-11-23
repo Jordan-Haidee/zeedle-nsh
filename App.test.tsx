@@ -1,6 +1,7 @@
 import { expect, open, test } from "nsh/test";
 import { AppConfig, Music } from "zeedle-nsh/native";
 import { createTrayOptions } from "./ui/tray";
+import { closeWindow } from "./ui/window";
 import "./tests/restore-app-config";
 
 const musicDirectory = Music.defaultDirectory();
@@ -19,6 +20,7 @@ type TestAppConfig = {
   current_page: number;
   sidebar_expanded: boolean;
   gallery_viewport_y: number;
+  close_to_tray: boolean;
 };
 
 const configFromStorage = (storage: Record<string, string> = {}): TestAppConfig => ({
@@ -36,6 +38,7 @@ const configFromStorage = (storage: Record<string, string> = {}): TestAppConfig 
   current_page: 0,
   sidebar_expanded: true,
   gallery_viewport_y: 0,
+  close_to_tray: false,
 });
 
 const savedConfig = () => JSON.parse(AppConfig.load()) as TestAppConfig;
@@ -105,7 +108,24 @@ test("tray actions restore the window, rescan songs, and expose exit", () => {
   expect(options.menu?.[3]).toMatchObject({ label: "Exit", role: "quit" });
 });
 
-test("closing the window hides it while keeping the app state alive", async () => {
+test("window close exits by default and hides only when keep-in-tray is enabled", () => {
+  const calls: string[] = [];
+  closeWindow(
+    false,
+    () => calls.push("hide"),
+    () => calls.push("quit"),
+  );
+  expect(calls).toEqual(["quit"]);
+
+  closeWindow(
+    true,
+    () => calls.push("hide"),
+    () => calls.push("quit"),
+  );
+  expect(calls).toEqual(["quit", "hide"]);
+});
+
+test("the close to tray setting persists from the settings page", async () => {
   const app = await openApp({
     width: 900,
     height: 510,
@@ -113,20 +133,27 @@ test("closing the window hides it while keeping the app state alive", async () =
     storage: { "zeedle.light-theme": "false" },
   });
   await app.waitFor("id:screen-0");
+  expect(savedConfig().close_to_tray).toBe(false);
+
   await app.press("id:nav-3");
   await app.waitFor("id:screen-3");
-  await app.waitUntil(() => savedConfig().current_page === 3);
+  await app.press("label:Keep in system tray when closing");
+  await app.waitUntil(() => savedConfig().close_to_tray);
 
   const window = app.window("main");
   await window.pressClose();
-
   expect(window.state()?.visible).toBe(false);
   expect(window.state() !== null).toBe(true);
-  expect(savedConfig().current_page).toBe(3);
 });
 
-test("the custom title bar close button hides the window", async () => {
+test("the custom title bar close button follows the close to tray setting", async () => {
   const app = await openApp({ width: 900, height: 510, platform: "windows" });
+  await app.waitFor("id:screen-0");
+  await app.press("id:nav-3");
+  await app.waitFor("id:screen-3");
+  await app.press("label:Keep in system tray when closing");
+  await app.waitUntil(() => savedConfig().close_to_tray);
+  await app.press("id:nav-0");
   await app.waitFor("id:screen-0");
   const window = app.window("main");
 
