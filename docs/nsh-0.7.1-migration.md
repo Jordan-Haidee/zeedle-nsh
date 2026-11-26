@@ -10,9 +10,10 @@ therefore covers both releases since 0.6.1.
   dragging, its minimum height, and dynamically measured insets around system
   controls. The app keeps its title, theme control, and platform-specific
   minimize, maximize, and close actions.
-- Keyboard shortcuts remain `keymap.bind` commands guarded by `notEditing`.
-  The 0.7 focus and key routing changes are covered by an app test that checks
-  Space toggles playback from content and remains text in the search field.
+- Keyboard shortcuts use `keymap.bind` with `scope: "window"` and `when:
+  "notEditing"`. The explicit main `<Window>` keeps playback and page commands
+  local if the app opens another window. A test checks Space toggles playback
+  from content and remains text in the search field.
 - NSH 0.7.1 also fixes the Windows title-bar accent color leaking into client
   content, which applies to the app's hidden title bar.
 

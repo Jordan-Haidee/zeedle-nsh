@@ -20,7 +20,7 @@ import { Checkbox as NshCheckbox, Input, TitleBar } from "nsh/base";
 import { ProgressSlider } from "./components/ProgressSlider";
 import { PlayerTransportButton, VolumeControl } from "./components/PlayerControls";
 import { Text } from "./components/Text";
-import { Application, currentWindow, Menu, Tray } from "nsh/desktop";
+import { Application, currentWindow, Menu, Tray, Window } from "nsh/desktop";
 import { AppConfig, Music } from "zeedle-nsh/native";
 import { LucideIcon, type LucideName } from "./icons";
 import cover from "../assets/cover.svg";
@@ -46,18 +46,11 @@ const contentCornerStyle = {
   borderBottomLeftRadius: 0,
 };
 
-export function App() {
+function AppWindow() {
   const startupStartedAt = Date.now();
   const config = JSON.parse(AppConfig.load()) as AppConfigValue;
   const appFontFamily = AppConfig.defaultFontFamily();
   const win = currentWindow();
-  win.set({
-    title: "Zeedle",
-    titleBar: { style: "hidden", height: 40 },
-    minSize: { width: 850, height: 500 },
-    maxSize: null,
-    closeOnPress: false,
-  });
   const page = signal<Page>(Math.max(0, Math.min(4, config.current_page)) as Page);
   const expanded = signal(config.sidebar_expanded);
   const closeToTray = signal(config.close_to_tray);
@@ -409,7 +402,7 @@ export function App() {
     f5: () => navigateToPage(4),
   };
 
-  keymap.bind(shortcuts, { when: "notEditing" });
+  keymap.bind(shortcuts, { when: "notEditing", scope: "window" });
 
   async function chooseDirectory() {
     const path = await Music.chooseDirectory();
@@ -1578,5 +1571,20 @@ export function App() {
         </View>
       ) : null}
     </View>
+  );
+}
+
+export function App() {
+  return (
+    <Window
+      id="main"
+      title="Zeedle"
+      titleBar={{ style: "hidden", height: 40 }}
+      minSize={{ width: 850, height: 500 }}
+      maxSize={null}
+      closeOnPress={false}
+    >
+      {AppWindow}
+    </Window>
   );
 }
