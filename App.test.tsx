@@ -49,6 +49,14 @@ async function openApp(options: NonNullable<Parameters<typeof open>[1]>) {
   return open("./App.tsx", options);
 }
 
+test("theme toggle stays beside the window controls", async () => {
+  const app = await openApp({ width: 900, height: 510, platform: "windows" });
+  await app.waitFor("id:theme-toggle");
+  const themeToggle = app.layout("id:theme-toggle");
+  expect(themeToggle).not.toBe(null);
+  expect(themeToggle!.x).toBeGreaterThan(500);
+});
+
 test("one pause click stays paused across playback state polls", async () => {
   const songs = JSON.parse(await Music.scan(musicDirectory)) as {
     song_name: string;
@@ -196,6 +204,33 @@ test("navigates between the five Zeedle pages", async () => {
     await app.waitFor(`id:screen-${index}`);
     expect(app.shows(`id:screen-${index}`)).toBe(true);
   }
+});
+
+test("playback shortcuts work from content and stay available to search typing", async () => {
+  const songs = JSON.parse(await Music.scan(musicDirectory)) as {
+    song_name: string;
+    singer: string;
+  }[];
+  if (!songs.length)
+    throw new Error("The default Music folder must contain a song for this keyboard test");
+  const app = await openApp({
+    width: 900,
+    height: 510,
+    platform: "windows",
+    storage: { "zeedle.music-directory": musicDirectory },
+  });
+  await app.waitFor(`text:${songs[0].song_name} - ${songs[0].singer}`);
+
+  await app.keyboard.press("space");
+  await app.waitUntil(() => JSON.parse(Music.state()).paused === false);
+  await app.keyboard.press("space");
+  await app.waitUntil(() => JSON.parse(Music.state()).paused === true);
+
+  await app.press("id:nav-1");
+  await app.type("id:song-search", "test");
+  await app.keyboard.press("space");
+  expect(app.value("id:song-search")).toBe("test ");
+  expect(JSON.parse(Music.state()).paused).toBe(true);
 });
 
 test("metadata actions open editable and confirmation dialogs", async () => {

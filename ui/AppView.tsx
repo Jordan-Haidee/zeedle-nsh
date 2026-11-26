@@ -16,11 +16,11 @@ import {
   type ListRef,
   type ViewRef,
 } from "nsh";
-import { Checkbox as NshCheckbox, Input } from "nsh/base";
+import { Checkbox as NshCheckbox, Input, TitleBar } from "nsh/base";
 import { ProgressSlider } from "./components/ProgressSlider";
 import { PlayerTransportButton, VolumeControl } from "./components/PlayerControls";
 import { Text } from "./components/Text";
-import { Application, currentWindow, Menu, Tray, titleBar } from "nsh/desktop";
+import { Application, currentWindow, Menu, Tray } from "nsh/desktop";
 import { AppConfig, Music } from "zeedle-nsh/native";
 import { LucideIcon, type LucideName } from "./icons";
 import cover from "../assets/cover.svg";
@@ -1306,63 +1306,57 @@ export function App() {
 
   return (
     <View class="min-h-125 min-w-212.5 flex-1 flex-col overflow-hidden border border-border bg-page">
-      <View
-        desktop={{ windowDrag: true }}
-        class="min-h-10 flex-row items-center bg-panel"
-        style={{
-          height: titleBar().height || 40,
-          paddingLeft: titleBar().left + 10,
-          paddingRight: titleBar().right,
-        }}
-      >
-        <View class="mr-1.5 size-4.5 overflow-hidden rounded">
-          <Image src={cover} class="size-4.5" />
-        </View>
-        <Text style={textStyle(13, textColor(), "600")}>Zeedle</Text>
-        <View class="flex-1" />
-        <View
-          testID="theme-toggle"
-          accessibilityLabel={t("Toggle theme")}
-          disabled={followSystem()}
-          disabledStyle={{ opacity: 0.4 }}
-          class="h-10 w-10.5 items-center justify-center hover:bg-hover"
-          onPress={() => {
-            if (followSystem()) return;
-            const next = !light();
-            setColorScheme(next ? "light" : "dark");
-          }}
-        >
-          <LucideIcon name={light() ? "sun" : "moon"} size={18} color={secondaryColor()} />
-        </View>
-        {titleBar().right === 0 ? (
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <View class="h-4 w-px bg-divider" />
-            <View
-              onPress={() => win.minimize()}
-              class="h-10 w-10.5 items-center justify-center hover:bg-hover"
-            >
-              <LucideIcon name="minus" size={18} color={secondaryColor()} />
-            </View>
-            <View
-              onPress={() =>
-                win.setMode(win.state()?.mode === "maximized" ? "normal" : "maximized")
-              }
-              class="h-10 w-10.5 items-center justify-center hover:bg-hover"
-            >
-              <LucideIcon name="square" size={12} color={secondaryColor()} />
-            </View>
-            <View
-              testID="window-close"
-              accessibilityLabel={t("Hide window")}
-              onPress={handleWindowClose}
-              class="h-10 w-10.5 items-center justify-center"
-              hoverStyle={{ backgroundColor: "#e81123" }}
-            >
-              <LucideIcon name="x" size={14} color={secondaryColor()} />
-            </View>
+      <TitleBar class="bg-panel">
+        <View class="h-10 flex-1 flex-row items-center pl-2.5">
+          <View class="mr-1.5 size-4.5 overflow-hidden rounded">
+            <Image src={cover} class="size-4.5" />
           </View>
-        ) : null}
-      </View>
+          <Text style={textStyle(13, textColor(), "600")}>Zeedle</Text>
+          <View class="flex-1" />
+          <View
+            testID="theme-toggle"
+            accessibilityLabel={t("Toggle theme")}
+            disabled={followSystem()}
+            disabledStyle={{ opacity: 0.4 }}
+            class="h-10 w-10.5 items-center justify-center hover:bg-hover"
+            onPress={() => {
+              if (followSystem()) return;
+              const next = !light();
+              setColorScheme(next ? "light" : "dark");
+            }}
+          >
+            <LucideIcon name={light() ? "sun" : "moon"} size={18} color={secondaryColor()} />
+          </View>
+          {win.titleBar().right === 0 ? (
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View class="h-4 w-px bg-divider" />
+              <View
+                onPress={() => win.minimize()}
+                class="h-10 w-10.5 items-center justify-center hover:bg-hover"
+              >
+                <LucideIcon name="minus" size={18} color={secondaryColor()} />
+              </View>
+              <View
+                onPress={() =>
+                  win.setMode(win.state()?.mode === "maximized" ? "normal" : "maximized")
+                }
+                class="h-10 w-10.5 items-center justify-center hover:bg-hover"
+              >
+                <LucideIcon name="square" size={12} color={secondaryColor()} />
+              </View>
+              <View
+                testID="window-close"
+                accessibilityLabel={t("Hide window")}
+                onPress={handleWindowClose}
+                class="h-10 w-10.5 items-center justify-center"
+                hoverStyle={{ backgroundColor: "#e81123" }}
+              >
+                <LucideIcon name="x" size={14} color={secondaryColor()} />
+              </View>
+            </View>
+          ) : null}
+        </View>
+      </TitleBar>
 
       <View style={{ flex: 1, minHeight: 0, flexDirection: "row" }}>
         <View class="bg-panel px-1.5 pt-2.25 pb-2.5" style={{ width: expanded() ? 200 : 54 }}>

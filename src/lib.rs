@@ -26,6 +26,18 @@ mod timing_tests {
             "first screen appeared in 123 ms"
         );
     }
+
+    #[test]
+    fn native_module_uses_the_specifier_imported_by_tsx() {
+        let description = nsh_core::element::description::Description::of(&[crate::registry()]);
+        let set = description
+            .sets
+            .iter()
+            .find(|set| set.specifier == "zeedle-nsh/native")
+            .expect("the TSX native module must be described");
+        assert!(set.exports.iter().any(|export| export.name == "Music"));
+        assert!(set.exports.iter().any(|export| export.name == "AppConfig"));
+    }
 }
 
 #[native_module("zeedle-nsh/native")]

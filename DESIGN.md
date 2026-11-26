@@ -12,6 +12,8 @@
 | Lyrics pane narrows | Artwork scales down to preserve its 16px side inset; lyric text keeps its 12px inset | No change |
 | Search field loses focus on page change or blank-area press | Immediate focus handoff; no motion | No change |
 | Gallery song row click | No pressed background; the row only has its existing pointer hover wash | No change |
+| Hidden title bar avoids native window controls | `nsh/base` `TitleBar` measures the row and updates its insets immediately on resize/full-screen changes | No change |
+| Window title bar drag, double-click, minimize, maximize, and close | Native window actions; no app-authored motion | Follows the platform |
 
 ## Keyboard behavior
 

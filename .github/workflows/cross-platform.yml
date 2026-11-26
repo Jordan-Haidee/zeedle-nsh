@@ -53,19 +53,19 @@ jobs:
             pkg-config \
             xvfb
 
-      - name: Install NSH 0.6.1 on Windows x64
+      - name: Install NSH 0.7.1 on Windows x64
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $env:NSH_VERSION = 'v0.6.1'
+          $env:NSH_VERSION = 'v0.7.1'
           irm https://nsh.dev/install.ps1 | iex
           "$env:LOCALAPPDATA\nsh\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 
-      - name: Install NSH 0.6.1 on Linux and macOS
+      - name: Install NSH 0.7.1 on Linux and macOS
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          export NSH_VERSION=v0.6.1
+          export NSH_VERSION=v0.7.1
           curl -fsSL https://nsh.dev/install.sh | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 

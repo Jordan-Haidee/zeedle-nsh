@@ -7,7 +7,7 @@ publish = false
 [workspace]
 
 [dependencies]
-nsh-core = "0.6.1"
+nsh-core = "0.7.1"
 base64 = "0.22"
 image = "0.25"
 lofty = "0.24"
