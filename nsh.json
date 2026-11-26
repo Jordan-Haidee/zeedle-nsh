@@ -1,14 +1,13 @@
 {
   "name": "Zeedle",
   "id": "dev.zeedle.music-player",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "build": 2,
   "theme": "theme.json",
   "icon": "assets/cover.png",
   "window": {
     "defaultSize": { "width": 900, "height": 510 },
     "defaultPosition": "center",
-    "defaultVisible": false,
     "minSize": { "width": 850, "height": 500 }
   },
   "rust": "."

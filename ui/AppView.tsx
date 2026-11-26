@@ -1152,7 +1152,7 @@ function AppWindow() {
         </View>
         <Text numberOfLines={2} style={{ ...textStyle(14, textColor()), textAlign: "center" }}>
           {t("Author:")} Jordan Haidee{"\n"}
-          {t("Version:")} 0.2.7
+          {t("Version:")} 0.2.8
         </Text>
         <View
           role="link"
