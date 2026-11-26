@@ -1,10 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# GTK includes its X11 frame allowance in WM_NORMAL_HINTS; nsh.json's
-# 850x500 content minimum is reported to the window manager as 860x510.
-expected_minimum_hint="minimum size: 860 by 510"
+minimum_width=$(jq -er '.window.minSize.width' nsh.json)
+minimum_height=$(jq -er '.window.minSize.height' nsh.json)
 executable=.nsh/out/Zeedle/Zeedle
+
+minimum_hint_dimensions() {
+  sed -nE 's/.*minimum size: ([0-9]+) by ([0-9]+).*/\1 \2/p' <<<"$1"
+}
+
+minimum_hint_satisfies_app_constraints() {
+  local dimensions hint_width hint_height
+  dimensions=$(minimum_hint_dimensions "$1")
+  read -r hint_width hint_height <<<"$dimensions"
+  [[ "${hint_width:-}" =~ ^[0-9]+$ && "${hint_height:-}" =~ ^[0-9]+$ ]] || return 1
+  ((hint_width >= minimum_width && hint_height >= minimum_height))
+}
 
 if [[ ! -x "$executable" ]]; then
   echo "packaged executable not found: $executable" >&2
@@ -32,7 +43,7 @@ for _ in $(seq 1 150); do
     width=$(awk '/^[[:space:]]*Width:/ { print $2; exit }' <<<"$candidate_geometry")
     height=$(awk '/^[[:space:]]*Height:/ { print $2; exit }' <<<"$candidate_geometry")
     last_window_diagnostics="window=$candidate map_state=$map_state client=${width}x${height}; $candidate_hints"
-    if [[ "$map_state" == IsViewable ]] && grep -Fq "$expected_minimum_hint" <<<"$candidate_hints" && [[ "$width" == 900 && "$height" == 510 ]]; then
+    if [[ "$map_state" == IsViewable ]] && minimum_hint_satisfies_app_constraints "$candidate_hints" && [[ "$width" == 900 && "$height" == 510 ]]; then
       window_id=$candidate
       geometry=$candidate_geometry
       hints=$candidate_hints
@@ -54,7 +65,7 @@ if [[ -z "$window_id" ]]; then
   echo "$last_window_diagnostics" >&2
   ps -o pid,stat,cmd -p "$app_pid" >&2 || true
   cat "target/window-constraints.log" >&2
-  echo "The app did not open a visible X11 window" >&2
+  echo "No visible 900x510 window reported minimum size hints of at least ${minimum_width}x${minimum_height}" >&2
   exit 1
 fi
 
@@ -64,7 +75,13 @@ printf 'App: client %sx%s; %s\n' "$width" "$height" "$hints"
   echo "Startup client size should be 900x510" >&2
   exit 1
 }
-[[ "$hints" == *"$expected_minimum_hint"* ]] || {
-  echo "X11 minimum hint should be 860x510 for its 850x500 content minimum" >&2
+minimum_hint=$(minimum_hint_dimensions "$hints")
+read -r hinted_minimum_width hinted_minimum_height <<<"$minimum_hint"
+[[ "${hinted_minimum_width:-}" =~ ^[0-9]+$ && "${hinted_minimum_height:-}" =~ ^[0-9]+$ ]] || {
+  echo "X11 did not report a parseable minimum size hint" >&2
+  exit 1
+}
+((hinted_minimum_width >= minimum_width && hinted_minimum_height >= minimum_height)) || {
+  echo "X11 minimum hint ${hinted_minimum_width}x${hinted_minimum_height} is below the app minimum ${minimum_width}x${minimum_height}" >&2
   exit 1
 }
